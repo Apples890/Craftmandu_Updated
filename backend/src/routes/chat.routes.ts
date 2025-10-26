@@ -1,0 +1,70 @@
+// routes/chat.routes.ts
+import { Router } from 'express';
+import { authMiddleware } from '@/middleware/auth.middleware';
+import { supabaseClient } from '@/config/database.config';
+import { z } from 'zod';
+import { validate } from '@/middleware/validation.middleware';
+
+const r = Router();
+r.use(authMiddleware);
+
+// Create or get conversation
+const convSchema = z.object({
+  vendorId: z.string().uuid(),
+  productId: z.string().uuid().nullable().optional(),
+});
+r.post('/conversations', validate({ body: convSchema }), async (req, res, next) => {
+  try {
+    const db = supabaseClient('anon', req.user!.jwt);
+    // upsert conversation unique(customer_id,vendor_id,product_id)
+    const { data, error } = await db.from('conversations')
+      .upsert({
+        customer_id: req.user!.id,
+        vendor_id: req.body.vendorId,
+        product_id: req.body.productId ?? null,
+      }, { onConflict: 'customer_id,vendor_id,product_id' })
+      .select('*')
+      .single();
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (e) { next(e); }
+});
+
+r.get('/conversations', async (req, res, next) => {
+  try {
+    const db = supabaseClient('anon', req.user!.jwt);
+    // list conversations where user is customer or vendor user
+    // vendors table to map vendor id to user id is enforced via RLS; here we show customer side
+    const { data, error } = await db.from('conversations').select('*').eq('customer_id', req.user!.id).order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ items: data });
+  } catch (e) { next(e); }
+});
+
+const messageSchema = z.object({
+  conversationId: z.string().uuid(),
+  content: z.string().min(1).max(4000),
+});
+r.post('/messages', validate({ body: messageSchema }), async (req, res, next) => {
+  try {
+    const db = supabaseClient('anon', req.user!.jwt);
+    const { data, error } = await db.from('messages').insert({
+      conversation_id: req.body.conversationId,
+      sender_id: req.user!.id,
+      content: req.body.content,
+    }).select('*').single();
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (e) { next(e); }
+});
+
+r.get('/messages/:conversationId', async (req, res, next) => {
+  try {
+    const db = supabaseClient('anon', req.user!.jwt);
+    const { data, error } = await db.from('messages').select('*').eq('conversation_id', req.params.conversationId).order('created_at', { ascending: true });
+    if (error) throw error;
+    res.json({ items: data });
+  } catch (e) { next(e); }
+});
+
+export default r;

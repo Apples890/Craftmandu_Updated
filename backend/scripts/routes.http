@@ -1,0 +1,38 @@
+### Set your base URL here
+@baseUrl = http://localhost:4000
+
+### Health
+GET {{baseUrl}}/health
+
+### Public products list
+# curl http://localhost:4000/api/products
+GET {{baseUrl}}/api/products
+
+### Product by slug
+# curl http://localhost:4000/api/products/test-product
+GET {{baseUrl}}/api/products/test-product
+
+### Me (requires Supabase access token)
+# curl -H "Authorization: Bearer $TOKEN" http://localhost:4000/api/auth/me
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### Vendor: my profile (requires token with VENDOR role)
+GET {{baseUrl}}/api/vendors/me
+Authorization: Bearer {{token}}
+
+### Vendor: create product
+POST {{baseUrl}}/api/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Test Product",
+  "slug": "test-product",
+  "priceCents": 1999,
+  "currency": "USD"
+}
+
+### Orders: mine
+GET {{baseUrl}}/api/orders/me
+Authorization: Bearer {{token}}
