@@ -42,7 +42,8 @@ function getKey(header: JwtHeader, cb: SigningKeyCallback) {
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const auth = req.header('authorization');
   if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    return;
   }
   const token = auth.slice(7);
 
@@ -56,16 +57,20 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
     },
     (err, payload) => {
       if (err || !payload || typeof payload !== 'object') {
-        return res.status(401).json({ error: 'Invalid or expired token' });
+        res.status(401).json({ error: 'Invalid or expired token' });
+        return;
       }
       const sub = (payload.sub as string) || '';
-      if (!sub) return res.status(401).json({ error: 'Missing subject in token' });
+      if (!sub) {
+        res.status(401).json({ error: 'Missing subject in token' });
+        return;
+      }
 
       // Optional custom role claim if you add it to JWT
       const role = (payload['app_role'] as UserRole) || undefined;
 
       req.user = { id: sub, role, jwt: token, ...payload };
-      return next();
+      next();
     }
   );
 }

@@ -15,11 +15,11 @@ export const AuthService = {
   async register(email: string, password: string, fullName: string) {
     const db = supabaseClient('service');
     // check existing
-    const { data: existing } = await db.from<UserDbRow>('users').select('id').eq('email', email).maybeSingle();
+    const { data: existing } = await db.from('users').select('id').eq('email', email).maybeSingle();
     if (existing) throw new BadRequestError('Email already in use');
 
     const password_hash = await hashPassword(password);
-    const { data, error } = await db.from<UserDbRow>('users').insert({
+    const { data, error } = await db.from('users').insert({
       email, password_hash, full_name: fullName, role: 'CUSTOMER',
     }).select('*').single();
     if (error) throw new BadRequestError(error.message);
@@ -30,7 +30,7 @@ export const AuthService = {
   /** Simple login against users table */
   async login(email: string, password: string) {
     const db = supabaseClient('service');
-    const { data, error } = await db.from<UserDbRow>('users').select('*').eq('email', email).single();
+    const { data, error } = await db.from('users').select('*').eq('email', email).single();
     if (error || !data) throw new UnauthorizedError('Invalid credentials');
     const ok = await comparePassword(password, data.password_hash);
     if (!ok) throw new UnauthorizedError('Invalid credentials');
@@ -41,7 +41,7 @@ export const AuthService = {
   /** Get profile using the caller's JWT so RLS applies */
   async getProfile(userId: string, jwt: string) {
     const db = supabaseClient('anon', jwt);
-    const { data, error } = await db.from<UserDbRow>('users').select('*').eq('id', userId).single();
+    const { data, error } = await db.from('users').select('*').eq('id', userId).single();
     if (error) throw new NotFoundError('User not found');
     return data;
   },
@@ -49,7 +49,7 @@ export const AuthService = {
   /** Update limited profile fields */
   async updateProfile(userId: string, jwt: string, patch: Partial<Pick<UserDbRow,'full_name'|'phone'|'avatar_url'>>) {
     const db = supabaseClient('anon', jwt);
-    const { data, error } = await db.from<UserDbRow>('users').update(patch).eq('id', userId).select('*').single();
+    const { data, error } = await db.from('users').update(patch).eq('id', userId).select('*').single();
     if (error) throw new BadRequestError(error.message);
     return data;
   },

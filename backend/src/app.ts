@@ -21,7 +21,7 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('/me', authMiddleware, (req, res) => res.json({ user: req.user }));
 
 // RBAC protected route
-app.get('/admin/metrics', authMiddleware, requireRole('ADMIN'), (req, res) => {
+app.get('/admin/metrics', authMiddleware, requireRole('ADMIN'), (_req, res) => {
   res.json({ metrics: { users: 0 } });
 });
 

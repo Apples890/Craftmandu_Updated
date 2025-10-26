@@ -13,7 +13,7 @@ import {
   RegistrationData,
   AuthContextType,
 } from '../models/Users';
-import { authService } from '../services/authService';
+import { authService } from '../api/authService';
 import { useNavigate } from 'react-router-dom'; // make sure this is at the top
 
 

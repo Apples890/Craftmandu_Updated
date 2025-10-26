@@ -6,7 +6,7 @@ import type { ReviewDbRow } from '@/types/review.types';
 export const ReviewService = {
   async listForProduct(productId: string) {
     const db = supabaseClient('anon');
-    const { data, error } = await db.from<ReviewDbRow>('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
+    const { data, error } = await db.from('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
     if (error) throw new BadRequestError(error.message);
     return data;
   },
@@ -20,7 +20,7 @@ export const ReviewService = {
       rating: payload.rating,
       comment: payload.comment ?? null,
     };
-    const { data, error } = await db.from<ReviewDbRow>('reviews').insert(insert).select('*').single();
+    const { data, error } = await db.from('reviews').insert(insert).select('*').single();
     if (error) throw new BadRequestError(error.message);
     return data;
   },

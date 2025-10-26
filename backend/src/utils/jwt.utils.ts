@@ -1,5 +1,5 @@
 // utils/jwt.utils.ts
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions, Secret } from 'jsonwebtoken';
 import { getSigningKey, authConfig } from '@/config/auth.config';
 import { AuthUser } from '@/middleware/auth.middleware';
 
@@ -33,7 +33,11 @@ export async function verifyJwt(token: string): Promise<AuthUser | null> {
 /**
  * Sign a JWT for internal service tokens (not Supabase)
  */
-export function signInternalJwt(payload: Record<string, unknown>, expiresIn = '1h'): string {
-  const secret = process.env.INTERNAL_JWT_SECRET || 'dev_secret';
-  return jwt.sign(payload, secret, { expiresIn });
+export function signInternalJwt(
+  payload: Record<string, unknown>,
+  expiresIn: SignOptions['expiresIn'] = '1h' as any
+): string {
+  const secret: Secret = (process.env.INTERNAL_JWT_SECRET || 'dev_secret') as Secret;
+  const options: SignOptions = { expiresIn };
+  return jwt.sign(payload as any, secret, options);
 }

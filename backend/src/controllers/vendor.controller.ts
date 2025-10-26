@@ -1,7 +1,7 @@
 // controllers/vendor.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { VendorService } from '@/services/vendor.service';
-import { vendorCreateSchema, vendorUpdateSchema } from '@/validators/vendor.validator';
+import { vendorUpdateSchema } from '@/validators/vendor.validator';
 import { validateInput } from '@/utils/validation.utils';
 
 export const VendorController = {

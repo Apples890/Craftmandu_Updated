@@ -10,7 +10,7 @@ const ACCEPT_MIME = (process.env.UPLOAD_ACCEPT || 'image/png,image/jpeg,image/we
 const storage = multer.memoryStorage();
 
 function fileFilter(
-  req: Request,
+  _req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) {

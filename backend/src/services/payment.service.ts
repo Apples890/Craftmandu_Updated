@@ -6,7 +6,7 @@ import { BadRequestError } from '@/utils/error.utils';
 function stripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error('STRIPE_SECRET_KEY not set');
-  return new Stripe(key, { apiVersion: '2024-06-20' });
+  return new Stripe(key, { apiVersion: '2023-10-16' });
 }
 
 export const PaymentService = {
