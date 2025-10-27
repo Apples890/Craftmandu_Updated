@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useAuthStore } from '../../store/authStore';
 
 
 const LoginPage: React.FC = () => {
-  const { login, session ,sendPasswordResetEmail } = useAuth();
+  const { sendPasswordResetEmail } = useAuth();
+  const loginAction = useAuthStore((s) => s.login);
+  const authError = useAuthStore((s) => s.error);
+  const status = useAuthStore((s) => s.status);
   const navigate = useNavigate();
 
 
@@ -18,9 +22,7 @@ const LoginPage: React.FC = () => {
   const [resetError, setResetError] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
-  console.log("here is log data: ", session);
-  console.log("Here is form data",formData);
-  console.log("LoginPage re-rendered with user:", session?.user);
+  // console.debug('Login form data', formData);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -35,7 +37,8 @@ const LoginPage: React.FC = () => {
       if (!formData.email) throw { email: 'Email is required' };
       if (!formData.password) throw { password: 'Password is required' };
 
-      await login(formData);
+      await loginAction(formData.email, formData.password);
+      navigate('/', { replace: true });
       // navigate('/cart');
     } catch (err: any) {
       setErrors(err);
@@ -159,10 +162,10 @@ const LoginPage: React.FC = () => {
 
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-orange-100">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {errors.general && (
+            {(errors.general || authError) && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
                 <AlertCircle className="w-5 h-5 text-red-500" />
-                <span className="text-red-700 text-sm">{errors.general}</span>
+                <span className="text-red-700 text-sm">{errors.general || authError}</span>
               </div>
             )}
 
@@ -237,10 +240,10 @@ const LoginPage: React.FC = () => {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || status === 'loading'}
               className="w-full bg-gradient-to-r from-red-600 to-orange-600 text-white py-3 rounded-lg hover:from-red-700 hover:to-orange-700 transition disabled:opacity-50"
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading || status === 'loading' ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
 

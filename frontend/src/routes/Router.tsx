@@ -17,6 +17,8 @@ import SetupUsernamePage from '../pages/auth/SetupUsernamePage';
 import VendorDashboard from '../pages/profile/VendorDashboard';
 import AdminDashboard from '../pages/profile/AdminDashboard';
 import CustomerDashboard from '../pages/profile/CustomerDashboard';
+import ProtectedRoute from '../components/auth/ProtectedRoute';
+import ProfileRedirect from '../pages/profile/ProfileRedirect';
 
 // Optional: guarded routes can be wrapped with your ProtectedRoute if desired
 // import ProtectedRoute from '../components/auth/ProtectedRoute';
@@ -38,9 +40,31 @@ const AppRoutes: React.FC = () => {
       <Route path="/verify-otp" element={<VerifyOTPPage />} />
       <Route path="/setup-username" element={<SetupUsernamePage />} />
 
-      <Route path="/vendor" element={<VendorDashboard />} />
-      <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/dashboard" element={<CustomerDashboard />} />
+      <Route
+        path="/vendor"
+        element={
+          <ProtectedRoute role="vendor">
+            <VendorDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute role="admin">
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute role="customer">
+            <CustomerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/profile" element={<ProfileRedirect />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -48,4 +72,3 @@ const AppRoutes: React.FC = () => {
 };
 
 export default AppRoutes;
-

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin, Heart } from 'lucide-react';
 
 const Footer: React.FC = () => {
+  const year = new Date().getFullYear();
   return (
     <footer className="bg-gradient-to-r from-gray-900 to-gray-800 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -142,7 +143,7 @@ const Footer: React.FC = () => {
         <div className="border-t border-gray-700 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="text-gray-400 text-sm">
-              © 2024 Craftsmandu. All rights reserved.
+              © {year} Craftsmandu. All rights reserved.
             </div>
             <div className="flex items-center space-x-1 text-gray-400 text-sm">
               <span>Made with</span>

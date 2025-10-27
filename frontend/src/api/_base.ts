@@ -1,10 +1,14 @@
 // api/_base.ts
 // Minimal fetch wrapper for frontend. Works in Next.js, Vite, CRA.
 // Uses either NEXT_PUBLIC_API_BASE_URL or VITE_API_BASE_URL.
+// Prefer relative base in Vite dev so the dev proxy handles CORS
+// api/_base.ts
 const BASE_URL =
-  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_BASE_URL) ||
+  (typeof process !== 'undefined' && (process.env as any)?.NEXT_PUBLIC_API_BASE_URL) ||
   (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL) ||
-  '';
+  (typeof process !== 'undefined' && (process.env as any)?.REACT_APP_API_BASE_URL) || // <= CRA support
+  'http://localhost:5000'; // final fallback
+
 
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
@@ -37,7 +41,6 @@ export async function request<T>(
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
-    credentials: 'include', // in case you use cookies
   });
 
   const contentType = res.headers.get('content-type') || '';

@@ -10,7 +10,7 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <CartProvider>
-          <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 flex flex-col">
+          <div className="min-h-screen bg-white flex flex-col">
             <Header />
             <main className="flex-grow">
               <AppRoutes />

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, SlidersHorizontal } from 'lucide-react';
 import { ProductFilters } from '../../services/productService';
+import { api } from '@/utils/api.client';
 
 interface ProductFiltersPanelProps {
   filters: ProductFilters;
@@ -14,31 +15,23 @@ const ProductFiltersPanel: React.FC<ProductFiltersPanelProps> = ({
   onFilterChange,
   onClearFilters,
 }) => {
-  const categories = [
-    'Textiles & Fabrics',
-    'Pottery & Ceramics',
-    'Jewelry & Accessories',
-    'Woodwork & Carving',
-    'Metalwork',
-    'Glass & Crystal',
-    'Leather Goods',
-    'Home Decor',
-    'Art & Paintings',
-    'Traditional Crafts'
-  ];
-
-  const regions = [
-    'Madhubani',
-    'Tharu',
-    'Newari',
-    'Tibetan',
-    'Sherpa',
-    'Tamang',
-    'Gurung',
-    'Limbu',
-    'Rai',
-    'Magar'
-  ];
+  const [categories, setCategories] = useState<string[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await api.get('/api/products/categories');
+        const names: string[] = (res.data?.items || []).map((c: any) => c.name);
+        if (mounted) setCategories(names);
+      } catch {
+        // fallback if DB empty
+        if (mounted) setCategories([
+          'Home & Kitchen', 'Textiles', 'Woodwork', 'Ceramics', 'Jewelry'
+        ]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const sortOptions = [
     { value: 'newest', label: 'Newest First' },
@@ -55,13 +48,7 @@ const ProductFiltersPanel: React.FC<ProductFiltersPanelProps> = ({
     { min: 200, max: undefined, label: 'Over $200' },
   ];
 
-  const hasActiveFilters = !!(
-    filters.category ||
-    filters.region ||
-    filters.minPrice ||
-    filters.maxPrice ||
-    filters.search
-  );
+  const hasActiveFilters = !!(filters.category || filters.minPrice || filters.maxPrice || filters.search);
 
   return (
     <motion.div
@@ -183,26 +170,7 @@ const ProductFiltersPanel: React.FC<ProductFiltersPanelProps> = ({
         </div>
       </div>
 
-      {/* Regions */}
-      <div>
-        <h4 className="font-medium text-gray-900 mb-3">Artisan Regions</h4>
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {regions.map((region) => (
-            <label key={region} className="flex items-center">
-              <input
-                type="radio"
-                name="region"
-                className="w-4 h-4 text-primary-600 focus:ring-primary-500"
-                checked={filters.region === region}
-                onChange={() => onFilterChange({ 
-                  region: filters.region === region ? '' : region 
-                })}
-              />
-              <span className="ml-2 text-sm text-gray-700">{region}</span>
-            </label>
-          ))}
-        </div>
-      </div>
+      {/* Regions removed */}
     </motion.div>
   );
 };

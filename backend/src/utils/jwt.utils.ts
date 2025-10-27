@@ -35,7 +35,7 @@ export async function verifyJwt(token: string): Promise<AuthUser | null> {
  */
 export function signInternalJwt(
   payload: Record<string, unknown>,
-  expiresIn: SignOptions['expiresIn'] = '1h' as any
+  expiresIn: SignOptions['expiresIn'] = '30m' as any
 ): string {
   const secret: Secret = (process.env.INTERNAL_JWT_SECRET || 'dev_secret') as Secret;
   const options: SignOptions = { expiresIn };

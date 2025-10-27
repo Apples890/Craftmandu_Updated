@@ -7,7 +7,8 @@ export type LoginPayload = { email: string; password: string };
 export const AuthApi = {
   // Server-side profile (requires Supabase access token in Authorization header)
   me(token: string) {
-    return request<{ auth: any; profile: any }>('/api/auth/me', 'GET', undefined, token);
+    // Use internal session endpoint that accepts our server-issued token
+    return request<{ profile: any }>('/api/auth/session', 'GET', undefined, token);
   },
 
   // Optional precheck to see if email exists (server uses service role)
@@ -22,5 +23,8 @@ export const AuthApi = {
 
   login(payload: LoginPayload) {
     return request<{ user: any; token: string }>('/api/auth/login', 'POST', payload);
+  },
+  refresh() {
+    return request<{ token: string }>('/api/auth/refresh', 'POST');
   },
 };

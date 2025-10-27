@@ -5,6 +5,7 @@ import { requireRole } from '@/middleware/role.middleware';
 import { validate } from '@/middleware/validation.middleware';
 import { z } from 'zod';
 import { supabaseClient } from '@/config/database.config';
+import { uploadSingleImage } from '@/middleware/upload.middleware';
 
 const r = Router();
 
@@ -23,7 +24,7 @@ r.use(authMiddleware, requireRole('VENDOR'));
 
 r.get('/me', async (req, res, next) => {
   try {
-    const db = supabaseClient('anon', req.user!.jwt);
+    const db = supabaseClient('service');
     const { data, error } = await db.from('vendors').select('*').eq('user_id', req.user!.id).single();
     if (error) throw error;
     res.json(data);
@@ -42,7 +43,7 @@ const updateSchema = z.object({
 });
 r.patch('/me', validate({ body: updateSchema }), async (req, res, next) => {
   try {
-    const db = supabaseClient('anon', req.user!.jwt);
+    const db = supabaseClient('service');
     const payload: any = {};
     if (req.body.shopName !== undefined) payload.shop_name = req.body.shopName;
     if (req.body.description !== undefined) payload.description = req.body.description;
@@ -56,6 +57,52 @@ r.patch('/me', validate({ body: updateSchema }), async (req, res, next) => {
     const { data, error } = await db.from('vendors').update(payload).eq('user_id', req.user!.id).select('*').single();
     if (error) throw error;
     res.json(data);
+  } catch (e) { next(e); }
+});
+
+// Upload logo image, store in vendor-assets bucket and update logo_url
+r.post('/logo', uploadSingleImage, async (req, res, next) => {
+  try {
+    if (!req.file) { res.status(400).json({ error: 'Missing file' }); return; }
+    const db = supabaseClient('service');
+    const { data: vendor, error } = await db.from('vendors').select('id').eq('user_id', req.user!.id).single();
+    if (error || !vendor) { res.status(404).json({ error: 'Vendor not found' }); return; }
+    const bucket = 'vendor-assets';
+    try { await (db as any).storage.createBucket(bucket, { public: true }); } catch {}
+    const vendorId = vendor.id;
+    const ext = (req.file.originalname.split('.').pop() || 'png').toLowerCase();
+    const filename = `logo_${Date.now()}.${ext}`;
+    const path = `vendors/${vendorId}/${filename}`;
+    const uploadRes = await (db as any).storage.from(bucket).upload(path, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+    if (uploadRes.error) throw uploadRes.error;
+    const { data: pub } = (db as any).storage.from(bucket).getPublicUrl(path);
+    const publicUrl: string | undefined = pub?.publicUrl;
+    const { data: updated, error: updErr } = await db.from('vendors').update({ logo_url: publicUrl || null }).eq('id', vendorId).select('*').single();
+    if (updErr) throw updErr;
+    res.json({ url: publicUrl, vendor: updated });
+  } catch (e) { next(e); }
+});
+
+// Upload banner image
+r.post('/banner', uploadSingleImage, async (req, res, next) => {
+  try {
+    if (!req.file) { res.status(400).json({ error: 'Missing file' }); return; }
+    const db = supabaseClient('service');
+    const { data: vendor, error } = await db.from('vendors').select('id').eq('user_id', req.user!.id).single();
+    if (error || !vendor) { res.status(404).json({ error: 'Vendor not found' }); return; }
+    const bucket = 'vendor-assets';
+    try { await (db as any).storage.createBucket(bucket, { public: true }); } catch {}
+    const vendorId = vendor.id;
+    const ext = (req.file.originalname.split('.').pop() || 'png').toLowerCase();
+    const filename = `banner_${Date.now()}.${ext}`;
+    const path = `vendors/${vendorId}/${filename}`;
+    const uploadRes = await (db as any).storage.from(bucket).upload(path, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+    if (uploadRes.error) throw uploadRes.error;
+    const { data: pub } = (db as any).storage.from(bucket).getPublicUrl(path);
+    const publicUrl: string | undefined = pub?.publicUrl;
+    const { data: updated, error: updErr } = await db.from('vendors').update({ banner_url: publicUrl || null }).eq('id', vendorId).select('*').single();
+    if (updErr) throw updErr;
+    res.json({ url: publicUrl, vendor: updated });
   } catch (e) { next(e); }
 });
 

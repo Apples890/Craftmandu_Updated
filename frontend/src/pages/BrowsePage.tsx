@@ -17,7 +17,6 @@ const BrowsePage: React.FC = () => {
     category: searchParams.get('category') || '',
     minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
     maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
-    region: searchParams.get('region') || '',
     sortBy: (searchParams.get('sortBy') as ProductFilters['sortBy']) || 'newest',
   });
 
@@ -102,11 +101,17 @@ const BrowsePage: React.FC = () => {
               </button>
             </div>
 
-            {/* Filters Toggle */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="lg:hidden btn-secondary flex items-center space-x-2"
-            >
+            {/* Inline Search for mobile */}
+            <div className="lg:hidden relative">
+              <input
+                type="text"
+                placeholder="Search..."
+                defaultValue={filters.search}
+                onKeyDown={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (e.key === 'Enter') setFilters(prev => ({ ...prev, search: v })); }}
+                className="w-48 pl-3 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <button onClick={() => setShowFilters(!showFilters)} className="lg:hidden btn-secondary flex items-center space-x-2">
               <SlidersHorizontal className="w-4 h-4" />
               <span>Filters</span>
             </button>

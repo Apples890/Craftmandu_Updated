@@ -1,23 +1,37 @@
 // api/vendor.api.ts
-import { request } from './_base';
+import { api } from '@/utils/api.client';
+
+export type VendorUpdatePayload = {
+  shopName?: string;
+  description?: string | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  country?: string | null;
+};
 
 export const VendorApi = {
-  getBySlug(slug: string) {
-    return request<any>(`/api/vendors/slug/${encodeURIComponent(slug)}`);
+  async me() {
+    const res = await api.get('/api/vendors/me');
+    return res.data as any;
   },
-  getMe(token: string) {
-    return request<any>('/api/vendors/me', 'GET', undefined, token);
+  async update(payload: VendorUpdatePayload) {
+    const res = await api.patch('/api/vendors/me', payload);
+    return res.data as any;
   },
-  updateMe(token: string, patch: {
-    shopName?: string;
-    description?: string | null;
-    logoUrl?: string | null;
-    bannerUrl?: string | null;
-    addressLine1?: string | null;
-    addressLine2?: string | null;
-    city?: string | null;
-    country?: string | null;
-  }) {
-    return request<any>('/api/vendors/me', 'PATCH', patch, token);
+  async uploadLogo(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await api.post('/api/vendors/logo', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return res.data as { url?: string; vendor?: any };
+  },
+  async uploadBanner(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await api.post('/api/vendors/banner', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return res.data as { url?: string; vendor?: any };
   },
 };
+

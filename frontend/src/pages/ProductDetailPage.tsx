@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 const ProductDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -30,10 +30,10 @@ const ProductDetailPage: React.FC = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (id) {
-      loadProduct(id);
+    if (slug) {
+      loadProduct(slug);
     }
-  }, [id]);
+  }, [slug]);
 
   const loadProduct = async (productId: string) => {
     try {

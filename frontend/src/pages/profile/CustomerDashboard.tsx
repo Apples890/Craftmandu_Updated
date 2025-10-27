@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import ProfileSection from '../../dashboard/ProfilePage';
@@ -6,24 +6,35 @@ import WishlistSection from '@/dashboard/customer/WishlistSection';
 import PurchaseHistorySection from '@/dashboard/customer/PurchaseHistorySection';
 import DeliverySection from '@/dashboard/customer/DeliverySection';
 import PromoCodeSection from '@/dashboard/customer/PromoCodeSection';
-
-// Sample customer profile data
-const customerProfileData = {
-  id: 'c1',
-  name: 'John Doe',
-  email: 'john.doe@example.com',
-  phone: '+1 (555) 123-4567',
-  address: '123 Main St, Anytown, CA 91234',
-  avatar: '/assets/customer-avatar.jpg',
-  joinDate: '2025-02-15',
-};
+import { useAuth } from '@/context/AuthContext';
 
 export default function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState('profile');
+  const { user, loading, recoverSession } = useAuth();
+
+  useEffect(() => {
+    if (!user) recoverSession().catch(() => {});
+  }, [user, recoverSession]);
+
+  const profileData = useMemo(() => ({
+    id: user?.id || '',
+    name: user?.full_name || user?.username || user?.email || 'User',
+    email: user?.email || '',
+    phone: user?.phone || null,
+    avatar: user?.avatar_url || null,
+    role: (user?.role ? String(user.role).toLowerCase() : 'customer') as string,
+    position: null,
+    joinDate: user?.created_at || null,
+    updatedAt: user?.updated_at || null,
+  }), [user]);
 
   return (
     <div className="container mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold mb-8">Customer Dashboard</h1>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <h1 className="text-2xl md:text-3xl font-semibold mb-8">Customer Dashboard</h1>
+      {loading && (
+        <div className="p-4">Loading profile…</div>
+      )}
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid grid-cols-5 w-full">
@@ -37,9 +48,9 @@ export default function CustomerDashboard() {
         <TabsContent value="profile" className="space-y-4">
           <Card>
             <CardContent className="pt-6">
-              <ProfileSection 
-                userType="customer" 
-                initialProfile={customerProfileData}
+              <ProfileSection
+                userType="customer"
+                initialProfile={profileData}
                 extraFields={
                   <div className="space-y-4">
                     <div>
@@ -98,6 +109,7 @@ export default function CustomerDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

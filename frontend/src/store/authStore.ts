@@ -10,7 +10,6 @@ type AuthState = {
   profile?: any | null;
   status: Status;
   error?: string | null;
-  // actions
   setToken: (t?: string) => void;
   refreshProfile: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -36,7 +35,13 @@ export const useAuthStore = create<AuthState>()(
           const { profile } = await AuthApi.me(token);
           set({ profile, status: 'success' });
         } catch (e: any) {
-          set({ status: 'error', error: e?.message || 'Failed to refresh profile' });
+          const msg = e?.message || 'Failed to refresh profile';
+          // If token expired/invalid, clear it so UI can prompt re-login
+          if (e?.status === 401) {
+            set({ token: undefined, profile: null, status: 'idle', error: null });
+          } else {
+            set({ status: 'error', error: msg });
+          }
         }
       },
       async login(email, password) {

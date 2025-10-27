@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import ProfileSection from '../../dashboard/ProfilePage';
@@ -6,24 +6,31 @@ import UsersManagementSection from '@/dashboard/admin/UsersManagementSection';
 import PromoManagementSection from '@/dashboard/admin/PromoManagementSection';
 import VendorManagementSection from '@/dashboard/admin/VendorManagementSection';
 import SystemAnalyticsSection from '@/dashboard/admin/SystemAnalyticsSection';
-
-// Sample admin profile data
-const adminProfileData = {
-  id: 'a1',
-  name: 'Charlie Brown',
-  email: 'charlie.brown@example.com',
-  phone: '+1 (555) 987-6543',
-  avatar: '/assets/admin-avatar.jpg',
-  role: 'System Administrator',
-  position: 'Senior Administrator',
-  joinDate: '2024-12-01',
-};
+import { useAuth } from '@/context/AuthContext';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('profile');
+  const { user, loading, recoverSession } = useAuth();
+
+  useEffect(() => {
+    if (!user) recoverSession().catch(() => {});
+  }, [user, recoverSession]);
+
+  const profileData = useMemo(() => ({
+    id: user?.id || '',
+    name: user?.full_name || user?.username || user?.email || 'User',
+    email: user?.email || '',
+    phone: user?.phone || null,
+    avatar: user?.avatar_url || null,
+    role: (user?.role ? String(user.role).toLowerCase() : 'admin') as string,
+    position: user?.position || null,
+    joinDate: user?.created_at || null,
+    updatedAt: user?.updated_at || null,
+  }), [user]);
 
   return (
-    <div className="container mx-auto py-8 px-4 bg-white shadow-md rounded-lg">
+    <div className="container mx-auto py-8 px-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid grid-cols-5 w-full">
@@ -37,9 +44,9 @@ export default function AdminDashboard() {
         <TabsContent value="profile" className="space-y-4">
           <Card>
             <CardContent className="pt-6">
-              <ProfileSection 
-                userType="admin" 
-                initialProfile={adminProfileData}
+              <ProfileSection
+                userType="admin"
+                initialProfile={profileData}
                 extraFields={
                   <div className="space-y-4">
                     <div>
@@ -98,6 +105,7 @@ export default function AdminDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

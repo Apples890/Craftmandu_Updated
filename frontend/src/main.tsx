@@ -4,6 +4,11 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import App from './App.tsx';
 import './index.css';
+import { registerAuthTokenGetter } from '@/utils/api.client';
+import { useAuthStore } from '@/store/authStore';
+
+// Ensure axios attaches Authorization from the auth store
+registerAuthTokenGetter(() => useAuthStore.getState().token);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

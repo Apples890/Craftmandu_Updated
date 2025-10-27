@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, User, Menu, X, Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { User as SupabaseUser } from '@supabase/supabase-js';
 
 
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [FullUser, getUserProfile] = useState<SupabaseUser | null>(null);
-  const { user, session, logout } = useAuth();
+  const { user, logout } = useAuth();
   const { items } = useCart();
   const navigate = useNavigate();
 
@@ -20,10 +18,8 @@ const Header: React.FC = () => {
     navigate('/');
     setIsUserMenuOpen(false);
   };
-  console.log('Header rendered with user:', user?.full_name);
-  console.log('Header rendered with user:', session?.user?.email);
-  console.log('Session from getSession:', session);
-  console.log('User after recovery:', user);
+  const roleLower = useMemo(() => (user?.role ? String(user.role).toLowerCase() : undefined), [user]);
+  const displayName = useMemo(() => (user?.full_name || user?.username || user?.email || 'User'), [user]);
 
 
   const cartItemCount = items.reduce((total, item) => total + item.quantity, 0);
@@ -81,6 +77,7 @@ const Header: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search handicrafts..."
+                onKeyDown={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (e.key === 'Enter') { navigate(`/browse?search=${encodeURIComponent(v)}`); } }}
                 className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-300"
               />
             </div>
@@ -113,18 +110,33 @@ const Header: React.FC = () => {
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center space-x-2 p-2 text-gray-600 hover:text-red-600 transition-colors duration-300"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-bold">
-                      {user.username?.charAt(0).toUpperCase() || 'U'}
-                    </span>
-                  </div>
+                  {user?.avatar_url ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={displayName}
+                      className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-bold">
+                        {displayName?.charAt(0)?.toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                  )}
                 </button>
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 py-2">
                     <div className="px-4 py-2 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-800">{user.username}</p>
-                      <p className="text-xs text-gray-500">{FullUser?.email}</p>
+                      <p className="text-sm font-medium text-gray-800">{displayName}</p>
+                      <p className="text-xs text-gray-500">{user.email}</p>
                     </div>
+                    <Link
+                      to={'/profile'}
+                      className="block px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      My Profile
+                    </Link>
                     <Link
                       to="/orders"
                       className="block px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200"
@@ -139,7 +151,7 @@ const Header: React.FC = () => {
                     >
                       Messages
                     </Link>
-                    {user.role === 'vendor' && (
+                    {roleLower === 'vendor' && (
                       <Link
                         to="/vendor"
                         className="block px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200"
@@ -148,7 +160,7 @@ const Header: React.FC = () => {
                         Vendor Dashboard
                       </Link>
                     )}
-                    {user.role === 'admin' && (
+                    {roleLower === 'admin' && (
                       <Link
                         to="/admin"
                         className="block px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200"
@@ -204,6 +216,7 @@ const Header: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search handicrafts..."
+                  onKeyDown={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (e.key === 'Enter') { setIsMenuOpen(false); navigate(`/browse?search=${encodeURIComponent(v)}`); } }}
                   className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
