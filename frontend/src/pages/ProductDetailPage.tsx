@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Star, 
@@ -19,15 +19,22 @@ import { productService, Product } from '../services/productService';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { useWishlist } from '@/context/WishlistContext';
+import { ChatApi } from '@/api/chat.api';
+import { useAuthStore } from '@/store/authStore';
 
 const ProductDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const { addToCart } = useCart();
+  const { toggle, has } = useWishlist();
   const { user } = useAuth();
+  const token = useAuthStore((s) => s.token);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (slug) {
@@ -37,11 +44,16 @@ const ProductDetailPage: React.FC = () => {
 
   const loadProduct = async (productId: string) => {
     try {
+      setNotFound(false);
       const productData = await productService.getProduct(productId);
       setProduct(productData);
     } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404) {
+        setNotFound(true);
+      }
       console.error('Failed to load product:', error);
-      toast.error('Failed to load product');
+      toast.error(status === 404 ? 'Product not found' : 'Failed to load product');
     } finally {
       setLoading(false);
     }
@@ -66,7 +78,10 @@ const ProductDetailPage: React.FC = () => {
   };
 
   const handleWishlist = () => {
-    toast.success('Added to wishlist!');
+    if (!product) return;
+    const inList = has(product.id);
+    toggle({ id: product.id, name: product.title, priceCents: product.price * 100, imageUrl: product.images[0] || '', vendorName: product.vendorName, slug: product.id });
+    toast.success(inList ? 'Removed from wishlist' : 'Added to wishlist');
   };
 
   const handleShare = () => {
@@ -98,6 +113,24 @@ const ProductDetailPage: React.FC = () => {
     }
   };
 
+  const handleMessageVendor = async () => {
+    if (!product) return;
+    if (!user || !token) {
+      navigate(`/login?redirect=${encodeURIComponent(`/product/${slug}`)}`);
+      return;
+    }
+    if (!product.vendorId) {
+      toast.error('Vendor not available for messaging');
+      return;
+    }
+    try {
+      const conv = await ChatApi.upsertConversation(token, product.vendorId, undefined);
+      navigate('/messages');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to start chat');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
@@ -121,6 +154,20 @@ const ProductDetailPage: React.FC = () => {
                 <div className="h-4 bg-gray-200 rounded w-3/4"></div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="card p-8 text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Product not found</h1>
+            <p className="text-gray-600 mb-6">The product you’re looking for doesn’t exist or may have been removed.</p>
+            <Link to="/browse" className="btn-primary inline-block">Back to Browse</Link>
           </div>
         </div>
       </div>
@@ -245,7 +292,7 @@ const ProductDetailPage: React.FC = () => {
                 )}
               </div>
               <div className="text-3xl font-bold text-primary-600 mb-4">
-                ${product.price}
+                <span className="text-gray-600 mr-2">Nrs</span>{product.price.toLocaleString()}
               </div>
             </div>
 
@@ -268,7 +315,7 @@ const ProductDetailPage: React.FC = () => {
                   <h4 className="font-semibold text-gray-900">{product.vendorName}</h4>
                   <p className="text-sm text-gray-600">{product.vendorShop}</p>
                 </div>
-                <button className="btn-secondary text-sm flex items-center space-x-1">
+                <button onClick={handleMessageVendor} className="btn-secondary text-sm flex items-center space-x-1">
                   <MessageCircle className="w-4 h-4" />
                   <span>Message</span>
                 </button>
@@ -308,8 +355,9 @@ const ProductDetailPage: React.FC = () => {
                 <button
                   onClick={handleWishlist}
                   className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                  title={product && has(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
-                  <Heart className="w-6 h-6 text-gray-600" />
+                  <Heart className={`w-6 h-6 ${product && has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-600'}`} />
                 </button>
                 <button
                   onClick={handleShare}
@@ -393,3 +441,6 @@ const ProductDetailPage: React.FC = () => {
 };
 
 export default ProductDetailPage;
+
+
+

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, Heart, ShoppingCart } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
 
 interface Product {
   id: string;
@@ -19,6 +20,8 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart } = useCart();
+  const { toggle, has } = useWishlist();
+  const inWishlist = has(product.id);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -48,8 +51,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           
           {/* Wishlist Button */}
-          <button className="absolute top-3 right-3 p-2 bg-white/90 rounded-full shadow-md hover:bg-white hover:scale-110 transition-all duration-300 opacity-0 group-hover:opacity-100">
-            <Heart className="w-4 h-4 text-gray-600 hover:text-red-500" />
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle({ id: product.id, name: product.name, priceCents: product.price*100, imageUrl: product.image, vendorName: product.vendor, slug: product.id }); }}
+            className="absolute top-3 right-3 p-2 bg-white/90 rounded-full shadow-md hover:bg-white hover:scale-110 transition-all duration-300 opacity-0 group-hover:opacity-100"
+            title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+          >
+            <Heart className={`w-4 h-4 ${inWishlist ? 'text-red-500 fill-red-500' : 'text-gray-600 hover:text-red-500'}`} />
           </button>
 
           {/* Quick Add to Cart */}

@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase.client';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { AuthApi } from '@/api/auth.api';
+import { useCartStore } from '@/store/cartStore';
 
 type AuthContextType = {
   user: any | null;
@@ -35,7 +36,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error,
     login,
     register,
-    logout,
+    logout: () => {
+      try {
+        useCartStore.getState().clear();
+      } finally {
+        logout();
+      }
+    },
     recoverSession: async () => { await refreshProfile(); },
     sendPasswordResetEmail: async (email: string) => {
       const { error } = await supabase.auth.resetPasswordForEmail(email);

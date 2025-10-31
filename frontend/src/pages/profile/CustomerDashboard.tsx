@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import ProfileSection from '../../dashboard/ProfilePage';
@@ -10,11 +11,26 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState('profile');
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading, recoverSession } = useAuth();
 
   useEffect(() => {
     if (!user) recoverSession().catch(() => {});
   }, [user, recoverSession]);
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t && t !== activeTab) setActiveTab(t);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const current = searchParams.get('tab');
+    if (activeTab !== (current || 'profile')) {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', activeTab);
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeTab]);
 
   const profileData = useMemo(() => ({
     id: user?.id || '',

@@ -1,122 +1,93 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Package, Truck, CheckCircle, Clock, MessageCircle, Star } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
+import { OrderApi } from '@/api/order.api';
 
-interface Order {
+type OrderRow = {
   id: string;
-  orderNumber: string;
-  date: string;
-  status: 'pending' | 'confirmed' | 'shipped' | 'delivered';
-  total: number;
-  items: {
-    id: string;
-    name: string;
-    image: string;
-    price: number;
-    quantity: number;
-    vendorName: string;
-  }[];
-}
+  order_number: string | null;
+  placed_at: string;
+  status: 'PENDING'|'PROCESSING'|'SHIPPED'|'DELIVERED'|'CANCELLED';
+  total_cents: number;
+  currency: string;
+};
 
 const OrderHistoryPage: React.FC = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
-    // Simulate loading orders
-    setTimeout(() => {
-      setOrders([
-        {
-          id: '1',
-          orderNumber: 'CN-2024-001',
-          date: '2024-01-15',
-          status: 'delivered',
-          total: 89.99,
-          items: [
-            {
-              id: '1',
-              name: 'Handwoven Silk Scarf',
-              image: 'https://images.pexels.com/photos/1070360/pexels-photo-1070360.jpeg?auto=compress&cs=tinysrgb&w=200',
-              price: 45.99,
-              quantity: 1,
-              vendorName: 'Artisan Textiles'
-            },
-            {
-              id: '2',
-              name: 'Ceramic Tea Set',
-              image: 'https://images.pexels.com/photos/1070361/pexels-photo-1070361.jpeg?auto=compress&cs=tinysrgb&w=200',
-              price: 44.00,
-              quantity: 1,
-              vendorName: 'Clay Creations'
-            }
-          ]
-        },
-        {
-          id: '2',
-          orderNumber: 'CN-2024-002',
-          date: '2024-01-20',
-          status: 'shipped',
-          total: 125.50,
-          items: [
-            {
-              id: '3',
-              name: 'Wooden Jewelry Box',
-              image: 'https://images.pexels.com/photos/1070360/pexels-photo-1070360.jpeg?auto=compress&cs=tinysrgb&w=200',
-              price: 125.50,
-              quantity: 1,
-              vendorName: 'Woodcraft Masters'
-            }
-          ]
-        }
-      ]);
-      setLoading(false);
-    }, 1000);
-  }, []);
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        if (!token) { setOrders([]); return; }
+        const res = await OrderApi.listMine(token);
+        if (!mounted) return;
+        setOrders(res.orders || []);
+      } catch {
+        if (mounted) setOrders([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [token]);
 
-  const getStatusIcon = (status: Order['status']) => {
+  const getStatusIcon = (status: OrderRow['status']) => {
     switch (status) {
-      case 'pending':
+      case 'PENDING':
         return <Clock className="w-5 h-5 text-yellow-500" />;
-      case 'confirmed':
+      case 'PROCESSING':
         return <CheckCircle className="w-5 h-5 text-blue-500" />;
-      case 'shipped':
+      case 'SHIPPED':
         return <Truck className="w-5 h-5 text-purple-500" />;
-      case 'delivered':
+      case 'DELIVERED':
         return <Package className="w-5 h-5 text-green-500" />;
       default:
         return <Clock className="w-5 h-5 text-gray-500" />;
     }
   };
 
-  const getStatusText = (status: Order['status']) => {
+  const getStatusText = (status: OrderRow['status']) => {
     switch (status) {
-      case 'pending':
+      case 'PENDING':
         return 'Order Pending';
-      case 'confirmed':
+      case 'PROCESSING':
         return 'Order Confirmed';
-      case 'shipped':
+      case 'SHIPPED':
         return 'Shipped';
-      case 'delivered':
+      case 'DELIVERED':
         return 'Delivered';
       default:
         return 'Unknown';
     }
   };
 
-  const getStatusColor = (status: Order['status']) => {
+  const getStatusColor = (status: OrderRow['status']) => {
     switch (status) {
-      case 'pending':
+      case 'PENDING':
         return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed':
+      case 'PROCESSING':
         return 'bg-blue-100 text-blue-800';
-      case 'shipped':
+      case 'SHIPPED':
         return 'bg-purple-100 text-purple-800';
-      case 'delivered':
+      case 'DELIVERED':
         return 'bg-green-100 text-green-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const summary = useMemo(() => {
+    const totalOrders = orders.length;
+    const delivered = orders.filter(o => o.status === 'DELIVERED').length;
+    const inProgress = orders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED').length;
+    const totalSpentNrs = Math.round(orders.reduce((sum, o) => sum + (o.total_cents || 0), 0) / 100);
+    return { totalOrders, delivered, inProgress, totalSpentNrs };
+  }, [orders]);
 
   if (loading) {
     return (
@@ -161,7 +132,7 @@ const OrderHistoryPage: React.FC = () => {
           <p className="text-gray-600">Track your orders and view past purchases</p>
         </motion.div>
 
-        {orders.length === 0 ? (
+        {(!loading && orders.length === 0) ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -178,6 +149,21 @@ const OrderHistoryPage: React.FC = () => {
           </motion.div>
         ) : (
           <div className="space-y-6">
+            {/* Summary cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Total Orders</p>
+                <p className="text-2xl font-bold">{summary.totalOrders}</p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Delivered</p>
+                <p className="text-2xl font-bold">{summary.delivered}</p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Total Spent</p>
+                <p className="text-2xl font-bold"><span className="text-gray-600 mr-1">Nrs</span>{summary.totalSpentNrs.toLocaleString()}</p>
+              </div>
+            </div>
             {orders.map((order, index) => (
               <motion.div
                 key={order.id}
@@ -190,10 +176,10 @@ const OrderHistoryPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 pb-4 border-b border-gray-200">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                      Order #{order.orderNumber}
+                      Order #{order.order_number || order.id.slice(0,8)}
                     </h3>
                     <p className="text-sm text-gray-600">
-                      Placed on {new Date(order.date).toLocaleDateString('en-US', {
+                      Placed on {new Date(order.placed_at).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
@@ -206,33 +192,13 @@ const OrderHistoryPage: React.FC = () => {
                       <span className="ml-2">{getStatusText(order.status)}</span>
                     </span>
                     <span className="text-lg font-bold text-gray-900">
-                      ${order.total.toFixed(2)}
+                      <span className="text-gray-600 mr-1">Nrs</span>{Math.round((order.total_cents || 0)/100).toLocaleString()}
                     </span>
                   </div>
                 </div>
 
-                {/* Order Items */}
-                <div className="space-y-4 mb-6">
-                  {order.items.map((item) => (
-                    <div key={item.id} className="flex items-center space-x-4">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-16 h-16 object-cover rounded-lg"
-                      />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{item.name}</h4>
-                        <p className="text-sm text-gray-600">by {item.vendorName}</p>
-                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-gray-900">
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {/* Order Items summary placeholder (detailed items fetch can be added later) */}
+                <div className="text-sm text-gray-600 mb-6">Items details will appear here when enabled.</div>
 
                 {/* Order Actions */}
                 <div className="flex flex-col sm:flex-row gap-3">

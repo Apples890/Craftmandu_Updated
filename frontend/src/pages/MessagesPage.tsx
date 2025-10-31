@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Search, MoreVertical, Phone, Video, Paperclip } from 'lucide-react';
+import { ChatApi } from '@/api/chat.api';
+import { useAuthStore } from '@/store/authStore';
 
 interface Message {
   id: string;
@@ -30,108 +32,71 @@ const MessagesPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
+  const token = useAuthStore((s) => s.token);
+  const profile = useAuthStore((s) => s.profile);
   useEffect(() => {
-    // Simulate loading conversations
-    setTimeout(() => {
-      setConversations([
-        {
-          id: '1',
-          participantId: 'vendor1',
-          participantName: 'Artisan Textiles',
-          participantAvatar: 'AT',
-          lastMessage: 'Thank you for your order! Your scarf will be shipped tomorrow.',
-          lastMessageTime: '2 hours ago',
-          unreadCount: 1,
-          isOnline: true,
-        },
-        {
-          id: '2',
-          participantId: 'vendor2',
-          participantName: 'Clay Creations',
-          participantAvatar: 'CC',
-          lastMessage: 'I can create a custom tea set in blue if you\'re interested.',
-          lastMessageTime: '1 day ago',
-          unreadCount: 0,
-          isOnline: false,
-        },
-        {
-          id: '3',
-          participantId: 'vendor3',
-          participantName: 'Woodcraft Masters',
-          participantAvatar: 'WM',
-          lastMessage: 'Your jewelry box is ready for pickup!',
-          lastMessageTime: '3 days ago',
-          unreadCount: 2,
-          isOnline: true,
-        },
-      ]);
-      setLoading(false);
-    }, 1000);
-  }, []);
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        if (!token) { setConversations([]); return; }
+        const res = await ChatApi.listConversations(token);
+        const list = (res.items || []).map((c: any) => {
+          const vendor = c.vendor || {};
+          return {
+            id: c.id,
+            participantId: c.vendor_id,
+            participantName: vendor.shop_name || 'Vendor',
+            participantAvatar: (vendor.shop_name ? vendor.shop_name.slice(0,2) : 'V').toUpperCase(),
+            lastMessage: '',
+            lastMessageTime: new Date(c.created_at).toLocaleString(),
+            unreadCount: 0,
+            isOnline: false,
+          } as Conversation;
+        });
+        if (mounted) setConversations(list);
+      } finally { if (mounted) setLoading(false); }
+    })();
+    return () => { mounted = false; };
+  }, [token]);
 
   useEffect(() => {
-    if (selectedConversation) {
-      // Simulate loading messages for selected conversation
-      setMessages([
-        {
-          id: '1',
-          senderId: 'vendor1',
-          senderName: 'Artisan Textiles',
-          content: 'Hello! Thank you for your interest in our handwoven scarves.',
-          timestamp: '2024-01-20T10:00:00Z',
-          isRead: true,
-        },
-        {
-          id: '2',
-          senderId: 'me',
-          senderName: 'You',
-          content: 'Hi! I love the silk scarf in your collection. Do you have it in other colors?',
-          timestamp: '2024-01-20T10:05:00Z',
-          isRead: true,
-        },
-        {
-          id: '3',
-          senderId: 'vendor1',
-          senderName: 'Artisan Textiles',
-          content: 'Yes! We have it in emerald green, deep blue, and burgundy. Would you like me to send you photos?',
-          timestamp: '2024-01-20T10:10:00Z',
-          isRead: true,
-        },
-        {
-          id: '4',
-          senderId: 'me',
-          senderName: 'You',
-          content: 'That would be great! I\'m particularly interested in the emerald green.',
-          timestamp: '2024-01-20T10:15:00Z',
-          isRead: true,
-        },
-        {
-          id: '5',
-          senderId: 'vendor1',
-          senderName: 'Artisan Textiles',
-          content: 'Thank you for your order! Your scarf will be shipped tomorrow.',
-          timestamp: '2024-01-20T14:30:00Z',
-          isRead: false,
-        },
-      ]);
-    }
-  }, [selectedConversation]);
+    let mounted = true;
+    (async () => {
+      if (!selectedConversation || !token) { setMessages([]); return; }
+      const res = await ChatApi.listMessages(token, selectedConversation);
+      const list = (res.items || []).map((m: any) => ({
+        id: m.id,
+        senderId: m.sender_id,
+        senderName: m.sender_id === (profile?.id || '') ? 'You' : 'Vendor',
+        content: m.content,
+        timestamp: m.created_at,
+        isRead: Boolean(m.is_read),
+      } as Message));
+      if (mounted) setMessages(list);
+    })();
+    return () => { mounted = false; };
+  }, [selectedConversation, token, profile?.id]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedConversation) return;
-
-    const message: Message = {
-      id: Date.now().toString(),
-      senderId: 'me',
-      senderName: 'You',
-      content: newMessage,
-      timestamp: new Date().toISOString(),
-      isRead: true,
-    };
-
-    setMessages(prev => [...prev, message]);
-    setNewMessage('');
+    if (!newMessage.trim() || !selectedConversation || !token) return;
+    const content = newMessage.trim();
+    try {
+      const saved = await ChatApi.sendMessage(token, selectedConversation, content);
+      setMessages(prev => ([
+        ...prev,
+        {
+          id: saved.id || Date.now().toString(),
+          senderId: profile?.id || 'me',
+          senderName: 'You',
+          content,
+          timestamp: saved.created_at || new Date().toISOString(),
+          isRead: true,
+        },
+      ]));
+      setNewMessage('');
+    } catch {}
   };
 
   const filteredConversations = conversations.filter(conv =>

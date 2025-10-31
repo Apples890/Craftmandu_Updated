@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Filter, Grid, List, SlidersHorizontal } from 'lucide-react';
@@ -23,6 +23,27 @@ const BrowsePage: React.FC = () => {
   useEffect(() => {
     loadProducts();
   }, [filters]);
+
+  // Keep filters in sync when URL search params change (e.g., from Header search)
+  useEffect(() => {
+    const next = {
+      search: searchParams.get('search') || '',
+      category: searchParams.get('category') || '',
+      minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
+      maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
+      sortBy: (searchParams.get('sortBy') as ProductFilters['sortBy']) || 'newest',
+    } as ProductFilters;
+
+    setFilters((prev) => {
+      const same =
+        (prev.search || '') === (next.search || '') &&
+        (prev.category || '') === (next.category || '') &&
+        (prev.minPrice ?? undefined) === (next.minPrice ?? undefined) &&
+        (prev.maxPrice ?? undefined) === (next.maxPrice ?? undefined) &&
+        (prev.sortBy || 'newest') === (next.sortBy || 'newest');
+      return same ? prev : next;
+    });
+  }, [searchParams]);
 
   useEffect(() => {
     // Update URL params when filters change
@@ -57,7 +78,6 @@ const BrowsePage: React.FC = () => {
       category: '',
       minPrice: undefined,
       maxPrice: undefined,
-      region: '',
       sortBy: 'newest',
     });
   };

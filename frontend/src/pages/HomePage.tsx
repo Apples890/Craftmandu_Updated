@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Star, Heart, ShoppingCart, Truck, Shield, Award, Users } from 'lucide-react';
+import { Search, Truck, Shield, Award, Users } from 'lucide-react';
 import ProductCard from '../components/product/ProductCard';
+import { productService } from '@/services/productService';
+import { api } from '@/utils/api.client';
 
 interface Product {
   id: string;
@@ -15,62 +17,20 @@ interface Product {
 
 const HomePage: React.FC = () => {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Array<{ name: string; slug: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Mock data for demonstration
-  const mockProducts: Product[] = [
-    {
-      id: '1',
-      name: 'Handwoven Pashmina Shawl',
-      price: 4500,
-      image: 'https://images.pexels.com/photos/7679720/pexels-photo-7679720.jpeg?auto=compress&cs=tinysrgb&w=400',
-      rating: 4.8,
-      vendor: 'Himalayan Crafts',
-      category: 'Textiles'
-    },
-    {
-      id: '2',
-      name: 'Traditional Khukuri Knife',
-      price: 3200,
-      image: 'https://images.pexels.com/photos/8728380/pexels-photo-8728380.jpeg?auto=compress&cs=tinysrgb&w=400',
-      rating: 4.9,
-      vendor: 'Mountain Forge',
-      category: 'Metalwork'
-    },
-    {
-      id: '3',
-      name: 'Carved Wooden Buddha',
-      price: 2800,
-      image: 'https://images.pexels.com/photos/8111357/pexels-photo-8111357.jpeg?auto=compress&cs=tinysrgb&w=400',
-      rating: 4.7,
-      vendor: 'Sacred Arts',
-      category: 'Woodwork'
-    },
-    {
-      id: '4',
-      name: 'Nepali Tea Set',
-      price: 1800,
-      image: 'https://images.pexels.com/photos/230477/pexels-photo-230477.jpeg?auto=compress&cs=tinysrgb&w=400',
-      rating: 4.6,
-      vendor: 'Tea Masters',
-      category: 'Ceramics'
-    }
-  ];
 
   useEffect(() => {
     const loadFeaturedProducts = async () => {
       try {
         setLoading(true);
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setFeaturedProducts(mockProducts);
+        const { products } = await productService.getProducts({ sortBy: 'newest' });
+        setFeaturedProducts((products || []).slice(0, 8));
         setError(null);
       } catch (err) {
         console.error('Failed to load featured products:', err);
         setError('Failed to load featured products');
-        // Use mock data as fallback
-        setFeaturedProducts(mockProducts);
       } finally {
         setLoading(false);
       }
@@ -79,14 +39,20 @@ const HomePage: React.FC = () => {
     loadFeaturedProducts();
   }, []);
 
-  const categories = [
-    { name: 'Textiles', icon: '🧵', count: 245 },
-    { name: 'Woodwork', icon: '🪵', count: 189 },
-    { name: 'Metalwork', icon: '⚒️', count: 156 },
-    { name: 'Ceramics', icon: '🏺', count: 134 },
-    { name: 'Jewelry', icon: '💎', count: 298 },
-    { name: 'Art', icon: '🎨', count: 167 }
-  ];
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await api.get('/api/products/categories');
+        const items = res.data?.items || [];
+        setCategories(items.map((c: any) => ({ name: c.name, slug: c.slug })));
+      } catch {
+        setCategories([]);
+      }
+    };
+    loadCategories();
+  }, []);
+
+  
 
   return (
     <div className="min-h-screen">
@@ -117,25 +83,7 @@ const HomePage: React.FC = () => {
             </Link>
           </div>
           
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-16">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-yellow-200">500+</div>
-              <div className="text-orange-200">Artisans</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-yellow-200">1200+</div>
-              <div className="text-orange-200">Products</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-yellow-200">50+</div>
-              <div className="text-orange-200">Categories</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-yellow-200">98%</div>
-              <div className="text-orange-200">Satisfaction</div>
-            </div>
-          </div>
+          {/* Stats removed: avoid static demo numbers */}
         </div>
       </section>
 
@@ -148,15 +96,11 @@ const HomePage: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
             {categories.map((category) => (
               <Link
-                key={category.name}
-                to={`/browse?category=${category.name.toLowerCase()}`}
+                key={category.slug}
+                to={`/browse?category=${encodeURIComponent(category.slug)}`}
                 className="group bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-2xl text-center hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-orange-100"
               >
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">
-                  {category.icon}
-                </div>
-                <h3 className="font-semibold text-gray-800 mb-1">{category.name}</h3>
-                <p className="text-sm text-gray-600">{category.count} items</p>
+                <h3 className="font-semibold text-gray-800">{category.name}</h3>
               </Link>
             ))}
           </div>
@@ -185,7 +129,7 @@ const HomePage: React.FC = () => {
           ) : error ? (
             <div className="text-center py-12">
               <div className="text-red-500 mb-4">⚠️ {error}</div>
-              <p className="text-gray-600">Showing sample products instead</p>
+              
             </div>
           ) : null}
 

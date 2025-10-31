@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, User, Menu, X, Heart } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, Heart, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
+import { api } from '@/utils/api.client';
 
 
 
@@ -12,6 +14,17 @@ const Header: React.FC = () => {
   const { user, logout } = useAuth();
   const { items } = useCart();
   const navigate = useNavigate();
+  const { count: wishlistCount } = useWishlist();
+  const [search, setSearch] = useState('');
+  const [suggestions, setSuggestions] = useState<Array<{ name: string; slug: string; image?: string }>>([]);
+  const [showSuggest, setShowSuggest] = useState(false);
+  const timerRef = useRef<number | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const [categories, setCategories] = useState<Array<{ name: string; slug: string }>>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -23,6 +36,59 @@ const Header: React.FC = () => {
 
 
   const cartItemCount = items.reduce((total, item) => total + item.quantity, 0);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        setShowSuggest(false);
+        setShowFilters(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  // Load categories for dropdowns
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await api.get('/api/products/categories');
+        const list = (res.data?.items || []).map((c: any) => ({ name: c.name as string, slug: c.slug as string }));
+        if (mounted) setCategories(list);
+      } catch {
+        if (mounted) setCategories([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    if (!search.trim()) { setSuggestions([]); setShowSuggest(false); return; }
+    timerRef.current = window.setTimeout(async () => {
+      try {
+        const { data } = await api.get('/api/products', { params: { search, limit: 8 } });
+        const items = (data?.items || []).map((it: any) => ({ name: it.name as string, slug: it.slug as string, image: it.image_url as string | undefined }));
+        setSuggestions(items);
+        setShowSuggest(true);
+      } catch {
+        setSuggestions([]); setShowSuggest(false);
+      }
+    }, 250) as any;
+  }, [search]);
+
+  function submitSearch(q?: string) {
+    const v = (q ?? search).trim();
+    if (!v) return;
+    setShowSuggest(false);
+    const params = new URLSearchParams();
+    params.set('search', v);
+    if (selectedCategory) params.set('category', selectedCategory);
+    if (minPrice) params.set('minPrice', String(Number(minPrice)));
+    if (maxPrice) params.set('maxPrice', String(Number(maxPrice)));
+    navigate(`/browse?${params.toString()}`);
+  }
 
   return (
     <header className="bg-white shadow-lg sticky top-0 z-50 border-b-2 border-orange-100">
@@ -59,36 +125,127 @@ const Header: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-                <Link to="/browse?category=textiles" className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200">Textiles</Link>
-                <Link to="/browse?category=woodwork" className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200">Woodwork</Link>
-                <Link to="/browse?category=metalwork" className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200">Metalwork</Link>
-                <Link to="/browse?category=ceramics" className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200">Ceramics</Link>
-                <Link to="/browse?category=jewelry" className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200">Jewelry</Link>
-                <Link to="/browse?category=art" className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200 rounded-b-lg">Art</Link>
+              <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 max-h-80 overflow-y-auto">
+                {categories.map((c) => (
+                  <Link key={c.slug} to={`/browse?category=${encodeURIComponent(c.slug)}`} className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-red-600 transition-colors duration-200">
+                    {c.name}
+                  </Link>
+                ))}
               </div>
             </div>
           </nav>
 
           {/* Search Bar */}
-          <div className="hidden lg:flex items-center flex-1 max-w-md mx-8">
+          <div className="hidden lg:flex items-center flex-1 max-w-md mx-8" ref={boxRef}>
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search handicrafts..."
-                onKeyDown={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (e.key === 'Enter') { navigate(`/browse?search=${encodeURIComponent(v)}`); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitSearch(); }}
                 className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-300"
               />
+              <button
+                type="button"
+                onClick={() => { setShowFilters((v) => !v); setShowSuggest(false); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-500 hover:text-red-600"
+                title="Filters"
+              >
+                <SlidersHorizontal className="w-5 h-5" />
+              </button>
+              {showFilters && (
+                <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-3 space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Category</label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="w-full border rounded-md px-2 py-2 text-sm"
+                    >
+                      <option value="">All Categories</option>
+                      {categories.map((c) => (
+                        <option key={c.slug} value={c.slug}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Price Range (Nrs)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="Min"
+                        value={minPrice}
+                        onChange={(e) => setMinPrice(e.target.value)}
+                        className="border rounded-md px-2 py-2 text-sm"
+                      />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="Max"
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(e.target.value)}
+                        className="border rounded-md px-2 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <button
+                      className="text-sm text-gray-600 hover:text-gray-800"
+                      onClick={() => { setSelectedCategory(''); setMinPrice(''); setMaxPrice(''); }}
+                    >
+                      Clear
+                    </button>
+                    <div className="space-x-2">
+                      <button
+                        className="text-sm px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
+                        onClick={() => setShowFilters(false)}
+                      >
+                        Close
+                      </button>
+                      <button
+                        className="text-sm px-3 py-1 rounded bg-gradient-to-r from-red-600 to-orange-600 text-white hover:from-red-700 hover:to-orange-700"
+                        onClick={() => { setShowFilters(false); submitSearch(); }}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {showSuggest && suggestions.length > 0 && (
+                <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s.slug}
+                      onClick={() => { setShowSuggest(false); navigate(`/product/${s.slug}`); }}
+                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-orange-50 text-left"
+                    >
+                      {s.image ? (<img src={s.image} alt={s.name} className="h-8 w-8 rounded object-cover border" />) : (<div className="h-8 w-8 rounded bg-gray-100 border" />)}
+                      <span className="text-sm text-gray-800">{s.name}</span>
+                    </button>
+                  ))}
+                  <div className="border-t">
+                    <button onClick={() => submitSearch()} className="w-full text-sm px-3 py-2 text-red-600 hover:bg-red-50">Search for "{search}"</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right Side Icons */}
           <div className="flex items-center space-x-4">
             {/* Wishlist */}
-            <button className="p-2 text-gray-600 hover:text-red-600 transition-colors duration-300 hover:scale-110 transform">
+            <Link to="/dashboard?tab=wishlist" className="relative p-2 text-gray-600 hover:text-red-600 transition-colors duration-300 hover:scale-110 transform">
               <Heart className="w-6 h-6" />
-            </button>
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
 
             {/* Cart */}
             <Link
@@ -237,13 +394,12 @@ const Header: React.FC = () => {
               </Link>
               <div className="border-t border-gray-200 pt-4">
                 <p className="text-gray-500 text-sm font-medium mb-2">Categories</p>
-                <div className="pl-4 space-y-2">
-                  <Link to="/browse?category=textiles" className="block text-gray-600 hover:text-red-600 py-1 transition-colors duration-200" onClick={() => setIsMenuOpen(false)}>Textiles</Link>
-                  <Link to="/browse?category=woodwork" className="block text-gray-600 hover:text-red-600 py-1 transition-colors duration-200" onClick={() => setIsMenuOpen(false)}>Woodwork</Link>
-                  <Link to="/browse?category=metalwork" className="block text-gray-600 hover:text-red-600 py-1 transition-colors duration-200" onClick={() => setIsMenuOpen(false)}>Metalwork</Link>
-                  <Link to="/browse?category=ceramics" className="block text-gray-600 hover:text-red-600 py-1 transition-colors duration-200" onClick={() => setIsMenuOpen(false)}>Ceramics</Link>
-                  <Link to="/browse?category=jewelry" className="block text-gray-600 hover:text-red-600 py-1 transition-colors duration-200" onClick={() => setIsMenuOpen(false)}>Jewelry</Link>
-                  <Link to="/browse?category=art" className="block text-gray-600 hover:text-red-600 py-1 transition-colors duration-200" onClick={() => setIsMenuOpen(false)}>Art</Link>
+                <div className="pl-4 space-y-2 max-h-64 overflow-y-auto">
+                  {categories.map((c) => (
+                    <Link key={c.slug} to={`/browse?category=${encodeURIComponent(c.slug)}`} className="block text-gray-600 hover:text-red-600 py-1 transition-colors duration-200" onClick={() => setIsMenuOpen(false)}>
+                      {c.name}
+                    </Link>
+                  ))}
                 </div>
               </div>
             </div>
@@ -255,3 +411,6 @@ const Header: React.FC = () => {
 };
 
 export default Header;
+
+
+

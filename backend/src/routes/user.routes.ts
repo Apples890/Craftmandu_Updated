@@ -19,10 +19,16 @@ r.get('/profile', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+const addressSchema = z.object({
+  address: z.string().min(1).max(200),
+  province: z.string().min(1).max(60),
+  district: z.string().min(1).max(60),
+});
 const updateSchema = z.object({
   fullName: z.string().min(1).max(120).optional(),
   phone: z.string().max(30).nullable().optional(),
   avatarUrl: z.string().url().nullable().optional(),
+  shippingAddress: addressSchema.optional(),
 });
 r.patch('/profile', validate({ body: updateSchema }), async (req, res, next) => {
   try {
@@ -31,6 +37,7 @@ r.patch('/profile', validate({ body: updateSchema }), async (req, res, next) => 
     if (req.body.fullName !== undefined) payload.full_name = req.body.fullName;
     if (req.body.phone !== undefined) payload.phone = req.body.phone;
     if (req.body.avatarUrl !== undefined) payload.avatar_url = req.body.avatarUrl;
+    if (req.body.shippingAddress !== undefined) payload.shipping_address_json = req.body.shippingAddress ?? null;
 
     const { data, error } = await db.from('users').update(payload).eq('id', req.user!.id).select('*').single();
     if (error) throw error;

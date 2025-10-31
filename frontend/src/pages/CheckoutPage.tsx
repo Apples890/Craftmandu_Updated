@@ -1,38 +1,75 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CreditCard, Truck, Shield, Lock } from 'lucide-react';
+import { Truck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { UserApi } from '@/api/user.api';
+import { api } from '@/utils/api.client';
 
+const NepalDistricts: Record<string, string[]> = {
+  'Koshi': ['Bhojpur','Dhankuta','Ilam','Jhapa','Khotang','Morang','Okhaldhunga','Panchthar','Sankhuwasabha','Solukhumbu','Sunsari','Taplejung','Udayapur'],
+  'Madhesh': ['Bara','Dhanusha','Mahottari','Parsa','Rautahat','Saptari','Sarlahi','Siraha'],
+  'Bagmati': ['Bhaktapur','Chitwan','Dhading','Dolakha','Kathmandu','Kavrepalanchok','Lalitpur','Makwanpur','Nuwakot','Ramechhap','Rasuwa','Sindhuli','Sindhupalchok'],
+  'Gandaki': ['Baglung','Gorkha','Kaski','Lamjung','Manang','Mustang','Myagdi','Nawalpur','Parbat','Syangja','Tanahun'],
+  'Lumbini': ['Arghakhanchi','Banke','Bardiya','Dang','Gulmi','Kapilvastu','Nawalparasi (West)','Palpa','Pyuthan','Rolpa','Rukum (East)','Rupandehi'],
+  'Karnali': ['Dailekh','Dolpa','Humla','Jajarkot','Jumla','Kalikot','Mugu','Rukum (West)','Salyan','Surkhet'],
+  'Sudurpashchim': ['Achham','Baitadi','Bajhang','Bajura','Dadeldhura','Darchula','Doti','Kailali','Kanchanpur'],
+};
 const CheckoutPage: React.FC = () => {
   const { items, total, clearCart } = useCart();
-  const { user } = useAuth();
+  const { user, recoverSession } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const initialized = useRef(false);
   const [formData, setFormData] = useState({
     // Shipping Address
     firstName: '',
     lastName: '',
     email: user?.email || '',
     phone: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: '',
+    address: '', // street address
+    province: '',
+    district: '',
     
     // Payment
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    cardName: '',
+    paymentMethod: 'COD' as 'COD' | 'WALLET',
+    wallet: '' as '' | 'ESEWA' | 'KHALTI',
     
     // Options
     saveAddress: false,
     newsletter: false,
   });
+
+  // Prefill name and phone from user profile once when available
+  useEffect(() => {
+    if (!user || initialized.current) return;
+    // Parse full name: first = all words except last; last = last word; single word => only first
+    const full = (user.full_name || user.username || '').trim();
+    let firstName = '';
+    let lastName = '';
+    if (full) {
+      const parts = full.split(/\s+/).filter(Boolean);
+      if (parts.length === 1) {
+        firstName = parts[0];
+      } else if (parts.length > 1) {
+        lastName = parts[parts.length - 1];
+        firstName = parts.slice(0, -1).join(' ');
+      }
+    }
+    setFormData((prev) => ({
+      ...prev,
+      firstName: prev.firstName || firstName,
+      lastName: prev.lastName || lastName,
+      email: prev.email || user.email || '',
+      phone: prev.phone || (user.phone || ''),
+      address: prev.address || (user.shipping_address_json?.address || ''),
+      province: prev.province || (user.shipping_address_json?.province || ''),
+      district: prev.district || (user.shipping_address_json?.district || ''),
+    }));
+    initialized.current = true;
+  }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -47,9 +84,33 @@ const CheckoutPage: React.FC = () => {
     setLoading(true);
 
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // If user is logged in and doesn't have a phone yet, persist the first-time phone number
+      if (user && !user.phone && formData.phone) {
+        try {
+          await UserApi.updateProfile({ phone: formData.phone });
+          await recoverSession();
+        } catch (err: any) {
+          // Non-blocking: proceed with checkout even if phone update fails
+        }
+      }
+            // Persist shipping address once if opted-in and user profile doesn't have it yet
+      if (user && !user.shipping_address_json && formData.saveAddress && formData.address && formData.province && formData.district) {
+        try {
+          await UserApi.updateProfile({ shippingAddress: { address: formData.address, province: formData.province, district: formData.district } });
+          await recoverSession();
+        } catch {}
+      }// Simulate payment processing
+      // Create orders on the server (one per vendor)
+      if (!items.length) throw new Error('Cart is empty');
+      const payload = {
+        items: items.map((it) => ({ product: (it as any).productId || (it as any).id, qty: (it as any).quantity })),
+        shipping: { address: formData.address, province: formData.province, district: formData.district },
+        payment: { method: (formData as any).paymentMethod || 'COD', wallet: (formData as any).wallet || undefined },
+      } as any;
+      await api.post('/api/orders/checkout', payload);
+      // Optional: brief UX delay
+      await new Promise(resolve => setTimeout(resolve, ((formData as any).paymentMethod === 'WALLET') ? 1500 : 800));
+
       // Clear cart and redirect
       clearCart();
       toast.success('Order placed successfully!');
@@ -138,195 +199,105 @@ const CheckoutPage: React.FC = () => {
                   />
                 </div>
               </motion.div>
-
-              {/* Shipping Address */}
+              {/* Shipping Address - Nepal specific */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
                 className="card p-6"
               >
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Shipping Address</h2>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Street Address *
-                    </label>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Shipping Address (Nepal)</h2>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Street Address *</label>
                     <input
                       type="text"
                       name="address"
                       value={formData.address}
                       onChange={handleInputChange}
                       className="input-field"
+                      placeholder="House/Street/Area"
                       required
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        City *
-                      </label>
-                      <input
-                        type="text"
-                        name="city"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        className="input-field"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        State/Province *
-                      </label>
-                      <input
-                        type="text"
-                        name="state"
-                        value={formData.state}
-                        onChange={handleInputChange}
-                        className="input-field"
-                        required
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Province *</label>
+                    <select
+                      name="province"
+                      value={formData.province}
+                      onChange={(e) => { handleInputChange(e); setFormData(prev => ({ ...prev, district: '' })); }}
+                      className="input-field"
+                      required
+                    >
+                      <option value="">Select Province</option>
+                      {Object.keys(NepalDistricts).map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        ZIP/Postal Code *
-                      </label>
-                      <input
-                        type="text"
-                        name="zipCode"
-                        value={formData.zipCode}
-                        onChange={handleInputChange}
-                        className="input-field"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Country *
-                      </label>
-                      <select
-                        name="country"
-                        value={formData.country}
-                        onChange={handleInputChange}
-                        className="input-field"
-                        required
-                      >
-                        <option value="">Select Country</option>
-                        <option value="US">United States</option>
-                        <option value="CA">Canada</option>
-                        <option value="UK">United Kingdom</option>
-                        <option value="AU">Australia</option>
-                        <option value="DE">Germany</option>
-                        <option value="FR">France</option>
-                        <option value="JP">Japan</option>
-                        <option value="NP">Nepal</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      name="saveAddress"
-                      checked={formData.saveAddress}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">District *</label>
+                    <select
+                      name="district"
+                      value={formData.district}
                       onChange={handleInputChange}
-                      className="w-4 h-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
-                    <label className="ml-2 text-sm text-gray-700">
-                      Save this address for future orders
-                    </label>
+                      className="input-field"
+                      required
+                      disabled={!formData.province}
+                    >
+                      <option value="">Select District</option>
+                      {!!formData.province && NepalDistricts[formData.province as keyof typeof NepalDistricts].map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              </motion.div>
 
-              {/* Payment Information */}
+                <div className="mt-4 flex items-center">
+                  <input
+                    type="checkbox"
+                    name="saveAddress"
+                    checked={formData.saveAddress}
+                    onChange={handleInputChange}
+                    className="w-4 h-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label className="ml-2 text-sm text-gray-700">Save this address for future orders</label>
+                </div>
+              </motion.div>
+              {/* Payment Method */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
                 className="card p-6"
               >
-                <div className="flex items-center space-x-2 mb-4">
-                  <CreditCard className="w-5 h-5 text-primary-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Payment Information</h2>
-                  <Lock className="w-4 h-4 text-gray-400" />
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Method</h2>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3">
+                    <input type="radio" name="paymentMethod" value="COD" checked={formData.paymentMethod === 'COD'} onChange={handleInputChange} />
+                    <span className="text-gray-700">Cash on Delivery (COD)</span>
+                  </label>
+                  <label className="flex items-center gap-3">
+                    <input type="radio" name="paymentMethod" value="WALLET" checked={formData.paymentMethod === 'WALLET'} onChange={handleInputChange} />
+                    <span className="text-gray-700">Digital Wallet</span>
+                  </label>
                 </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Cardholder Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="cardName"
-                      value={formData.cardName}
-                      onChange={handleInputChange}
-                      className="input-field"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Card Number *
-                    </label>
-                    <input
-                      type="text"
-                      name="cardNumber"
-                      value={formData.cardNumber}
-                      onChange={handleInputChange}
-                      placeholder="1234 5678 9012 3456"
-                      className="input-field"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Expiry Date *
-                      </label>
-                      <input
-                        type="text"
-                        name="expiryDate"
-                        value={formData.expiryDate}
-                        onChange={handleInputChange}
-                        placeholder="MM/YY"
-                        className="input-field"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        CVV *
-                      
-                      </label>
-                      <input
-                        type="text"
-                        name="cvv"
-                        value={formData.cvv}
-                        onChange={handleInputChange}
-                        placeholder="123"
-                        className="input-field"
-                        required
-                      />
+                {formData.paymentMethod === 'WALLET' && (
+                  <div className="mt-4 space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Choose Wallet</label>
+                    <select name="wallet" value={formData.wallet} onChange={handleInputChange} className="input-field" required>
+                      <option value="">Select provider</option>
+                      <option value="ESEWA">eSewa</option>
+                      <option value="KHALTI">Khalti</option>
+                    </select>
+                    <div className="p-3 bg-gray-50 rounded text-sm text-gray-600">
+                      You will be redirected to {formData.wallet === 'ESEWA' ? 'eSewa' : formData.wallet === 'KHALTI' ? 'Khalti' : 'the wallet'} to complete payment.
                     </div>
                   </div>
-                </div>
-
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Shield className="w-4 h-4 text-green-500" />
-                    <span>Your payment information is encrypted and secure</span>
-                  </div>
-                </div>
+                )}
               </motion.div>
             </div>
 
@@ -354,7 +325,7 @@ const CheckoutPage: React.FC = () => {
                         <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
                       </div>
                       <span className="text-sm font-medium text-gray-900">
-                        ${(item.price * item.quantity).toFixed(2)}
+                        <span className="text-gray-600 mr-1">Nrs</span>{(item.price * item.quantity).toLocaleString()}
                       </span>
                     </div>
                   ))}
@@ -364,7 +335,7 @@ const CheckoutPage: React.FC = () => {
                 <div className="space-y-3 mb-6 pt-6 border-t border-gray-200">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium">${total.toFixed(2)}</span>
+                    <span className="font-medium"><span className="text-gray-600 mr-1">Nrs</span>{total.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Shipping</span>
@@ -372,12 +343,12 @@ const CheckoutPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Tax</span>
-                    <span className="font-medium">${taxAmount.toFixed(2)}</span>
+                    <span className="font-medium"><span className="text-gray-600 mr-1">Nrs</span>{taxAmount.toLocaleString()}</span>
                   </div>
                   <hr className="border-gray-200" />
                   <div className="flex justify-between text-lg font-semibold">
                     <span>Total</span>
-                    <span className="text-primary-600">${finalTotal.toFixed(2)}</span>
+                    <span className="text-primary-600"><span className="text-gray-600 mr-1">Nrs</span>{finalTotal.toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -395,7 +366,7 @@ const CheckoutPage: React.FC = () => {
                   disabled={loading}
                   className="w-full btn-primary text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Processing...' : `Complete Order - $${finalTotal.toFixed(2)}`}
+                  {loading ? 'Processing...' : `Complete Order - Nrs ${finalTotal.toLocaleString()}`}
                 </button>
 
                 {/* Newsletter */}
@@ -421,3 +392,10 @@ const CheckoutPage: React.FC = () => {
 };
 
 export default CheckoutPage;
+
+
+
+
+
+
+

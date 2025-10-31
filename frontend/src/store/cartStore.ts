@@ -9,6 +9,7 @@ export type CartItem = {
   qty: number;
   imageUrl?: string | null;
   vendorId?: string;
+  vendorName?: string;
 };
 
 type CartState = {
@@ -17,8 +18,6 @@ type CartState = {
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
   clear: () => void;
-  count: number;
-  totalCents: number;
 };
 
 export const useCartStore = create<CartState>()(
@@ -47,16 +46,21 @@ export const useCartStore = create<CartState>()(
       clear() {
         set({ items: [] });
       },
-      get count() {
-        return get().items.reduce((n, i) => n + i.qty, 0);
-      },
-      get totalCents() {
-        return get().items.reduce((sum, i) => sum + i.priceCents * i.qty, 0);
-      },
     }),
     {
       name: 'cart-storage',
+      version: 2,
       storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ items: state.items }),
+      migrate: (persisted: any, fromVersion) => {
+        if (!persisted) return { items: [] } as any;
+        // Drop any accidentally persisted computed props from older versions
+        if (fromVersion && fromVersion < 2) {
+          const items = Array.isArray((persisted as any).items) ? (persisted as any).items : [];
+          return { items } as any;
+        }
+        return persisted;
+      },
     }
   )
 );

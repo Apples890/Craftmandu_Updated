@@ -88,18 +88,67 @@ if (process.env.NODE_ENV !== 'production') {
     } catch (e) { next(e); }
   });
 }
-// Public list & detail
+// Public list with filters
 r.get('/', validate({ query: paginationSchema.partial() }), async (req, res, next) => {
   try {
-    const db = supabaseClient('anon');
-    const { data, error } = await db
+    const db = supabaseClient('service');
+    const limit = Number(req.query['limit'] || 20);
+    const search = (req.query['search'] as string | undefined)?.trim();
+    const category = (req.query['category'] as string | undefined)?.trim(); // slug
+    const minCents = req.query['minPriceCents'] ? Number(req.query['minPriceCents']) : undefined;
+    const maxCents = req.query['maxPriceCents'] ? Number(req.query['maxPriceCents']) : undefined;
+    const sortBy = (req.query['sortBy'] as string | undefined) || 'newest';
+
+    let q = db
       .from('products')
-      .select('id, name, slug, description, price_cents, currency, status, created_at, updated_at, product_images(image_url, sort_order)')
-      .eq('status', 'ACTIVE')
-      .order('created_at', { ascending: false })
-      .limit(Number(req.query['limit'] || 20));
+      .select('id, vendor_id, category_id, name, slug, description, price_cents, currency, status, created_at, updated_at, product_images(image_url, sort_order)')
+      .eq('status', 'ACTIVE');
+
+    if (search) {
+      const term = `%${search}%`;
+      // match against name, description, and slug for better keyword coverage
+      q = q.or(`(name.ilike.${term},description.ilike.${term},slug.ilike.${term})`);
+    }
+    if (category) {
+      // find category id by slug
+      const { data: cat } = await db.from('categories').select('id').eq('slug', category).maybeSingle();
+      if (cat?.id) q = q.eq('category_id', cat.id);
+      else q = q.eq('category_id', null); // no matches
+    }
+    if (minCents !== undefined) q = q.gte('price_cents', minCents);
+    if (maxCents !== undefined) q = q.lte('price_cents', maxCents);
+
+    if (sortBy === 'price') q = q.order('price_cents', { ascending: true });
+    else q = q.order('created_at', { ascending: false });
+
+    q = q.limit(limit);
+
+    const { data, error } = await q;
     if (error) throw error;
-    res.json({ items: data });
+
+    const vendorIds = Array.from(new Set((data || []).map((d: any) => d.vendor_id).filter(Boolean)));
+    const categoryIds = Array.from(new Set((data || []).map((d: any) => d.category_id).filter(Boolean)));
+    const vendorMap: Record<string, any> = {};
+    const catMap: Record<string, any> = {};
+    if (vendorIds.length) {
+      const { data: vrows } = await db.from('vendors').select('id, shop_name, slug').in('id', vendorIds);
+      (vrows || []).forEach((v: any) => (vendorMap[v.id] = v));
+    }
+    if (categoryIds.length) {
+      const { data: crows } = await db.from('categories').select('id, name, slug').in('id', categoryIds);
+      (crows || []).forEach((c: any) => (catMap[c.id] = c));
+    }
+
+    const items = (data || []).map((d: any) => {
+      const firstImg = (d.product_images && d.product_images[0]?.image_url) || null;
+      return {
+        ...d,
+        vendor: vendorMap[d.vendor_id] || null,
+        category: catMap[d.category_id] || null,
+        image_url: firstImg,
+      };
+    });
+    res.json({ items });
   } catch (e) { next(e); }
 });
 
@@ -113,6 +162,114 @@ r.get('/categories', async (_req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// detail route moved below vendor routes to prevent '/mine' matching ':slug'
+
+// Vendor-managed CRUD
+const upsertSchema = z.object({
+  name: z.string().min(2),
+  slug: z.string().min(2),
+  description: z.string().nullable().optional(),
+  priceCents: z.number().int().min(0),
+  currency: z.string().min(3).max(3).default('USD'),
+  status: z.enum(['DRAFT','ACTIVE','INACTIVE']).default('ACTIVE'),
+  categoryId: z.string().uuid().nullable().optional(),
+});
+
+r.get('/mine', authMiddleware, requireRole('VENDOR'), async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const { data: vendor } = await db.from('vendors').select('id').eq('user_id', req.user!.id).maybeSingle();
+    if (!vendor) { res.json({ items: [] }); return; }
+    const { data, error } = await db
+      .from('products')
+      .select('id, name, slug, description, price_cents, currency, status, created_at, updated_at, product_images(image_url, sort_order)')
+      .eq('vendor_id', vendor.id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ items: data });
+  } catch (e) { next(e); }
+});
+
+r.post('/', authMiddleware, requireRole('VENDOR'), validate({ body: upsertSchema }), async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    // find vendor id for this user
+    const { data: vendor } = await db.from('vendors').select('id').eq('user_id', req.user!.id).single();
+
+    const payload = {
+      vendor_id: vendor!.id,
+      name: req.body.name,
+      slug: req.body.slug,
+      description: req.body.description ?? null,
+      price_cents: req.body.priceCents,
+      currency: req.body.currency,
+      status: req.body.status,
+      category_id: req.body.categoryId ?? null,
+    };
+
+    const { data, error } = await db.from('products').insert(payload).select('*').single();
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (e) { next(e); }
+});
+
+r.patch('/:id', authMiddleware, requireRole('VENDOR'), validate({ body: upsertSchema.partial() }), async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const patch: any = {};
+    if (req.body.name !== undefined) patch.name = req.body.name;
+    if (req.body.slug !== undefined) patch.slug = req.body.slug;
+    if (req.body.description !== undefined) patch.description = req.body.description;
+    if (req.body.priceCents !== undefined) patch.price_cents = req.body.priceCents;
+    if (req.body.currency !== undefined) patch.currency = req.body.currency;
+    if (req.body.status !== undefined) patch.status = req.body.status;
+    if (req.body.categoryId !== undefined) patch.category_id = req.body.categoryId;
+
+    const { data, error } = await db.from('products').update(patch).eq('id', req.params.id).select('*').single();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) { next(e); }
+});
+
+r.delete('/:id', authMiddleware, requireRole('VENDOR'), async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const { error } = await db.from('products').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.status(204).send();
+  } catch (e) { next(e); }
+});
+
+r.post('/:id/images', authMiddleware, requireRole('VENDOR'), uploadSingleImage, async (req, res, next) => {
+  try {
+    if (!req.file) { res.status(400).json({ error: 'Missing file' }); return; }
+    const db = supabaseClient('service');
+    const productId = req.params.id;
+    const { data: vendor } = await db.from('vendors').select('id').eq('user_id', req.user!.id).maybeSingle();
+    const { data: prod } = await db.from('products').select('id, vendor_id').eq('id', productId).maybeSingle();
+    if (!vendor || !prod || prod.vendor_id !== vendor.id) { res.status(403).json({ error: 'Forbidden' }); return; }
+    const bucket = 'product-assets';
+    try { await (db as any).storage.createBucket(bucket, { public: true }); } catch {}
+    const ext = (req.file.originalname.split('.').pop() || 'png').toLowerCase();
+    const filename = `img_${Date.now()}.${ext}`;
+    const path = `products/${productId}/${filename}`;
+    const uploadRes = await (db as any).storage.from(bucket).upload(path, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+    if (uploadRes.error) throw uploadRes.error;
+    const { data: pub } = (db as any).storage.from(bucket).getPublicUrl(path);
+    const url: string | undefined = pub?.publicUrl;
+    const { data: existing } = await db.from('product_images').select('sort_order').eq('product_id', productId).order('sort_order', { ascending: false }).limit(1);
+    const nextOrder = existing && existing[0] ? (existing[0].sort_order as number) + 1 : 0;
+    const { data: row, error: insErr } = await db
+      .from('product_images')
+      .insert({ product_id: productId, image_url: url || '', sort_order: nextOrder })
+      .select('*')
+      .single();
+    if (insErr) throw insErr;
+    res.json({ image: row });
+  } catch (e) { next(e); }
+});
+
+// Public detail (placed after vendor routes)
 r.get('/:slug', async (req, res, next) => {
   try {
     const db = supabaseClient('service');
@@ -146,116 +303,6 @@ r.get('/:slug', async (req, res, next) => {
       category,
       inventory: { qty_available: qty },
     });
-  } catch (e) { next(e); }
-});
-
-// Vendor-managed CRUD
-const upsertSchema = z.object({
-  name: z.string().min(2),
-  slug: z.string().min(2),
-  description: z.string().nullable().optional(),
-  priceCents: z.number().int().min(0),
-  currency: z.string().min(3).max(3).default('USD'),
-  status: z.enum(['DRAFT','ACTIVE','INACTIVE']).default('ACTIVE'),
-  categoryId: z.string().uuid().nullable().optional(),
-  sku: z.string().nullable().optional(),
-});
-
-r.use(authMiddleware, requireRole('VENDOR'));
-
-r.get('/mine', async (req, res, next) => {
-  try {
-    const db = supabaseClient('service');
-    const { data: vendor } = await db.from('vendors').select('id').eq('user_id', req.user!.id).maybeSingle();
-    if (!vendor) { res.json({ items: [] }); return; }
-    const { data, error } = await db
-      .from('products')
-      .select('id, name, slug, description, price_cents, currency, status, created_at, updated_at')
-      .eq('vendor_id', vendor.id)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    res.json({ items: data });
-  } catch (e) { next(e); }
-});
-
-r.post('/', validate({ body: upsertSchema }), async (req, res, next) => {
-  try {
-    const db = supabaseClient('service');
-    // find vendor id for this user
-    const { data: vendor } = await db.from('vendors').select('id').eq('user_id', req.user!.id).single();
-
-    const payload = {
-      vendor_id: vendor!.id,
-      name: req.body.name,
-      slug: req.body.slug,
-      description: req.body.description ?? null,
-      price_cents: req.body.priceCents,
-      currency: req.body.currency,
-      status: req.body.status,
-      category_id: req.body.categoryId ?? null,
-      sku: req.body.sku ?? null,
-    };
-
-    const { data, error } = await db.from('products').insert(payload).select('*').single();
-    if (error) throw error;
-    res.status(201).json(data);
-  } catch (e) { next(e); }
-});
-
-r.patch('/:id', validate({ body: upsertSchema.partial() }), async (req, res, next) => {
-  try {
-    const db = supabaseClient('service');
-    const patch: any = {};
-    if (req.body.name !== undefined) patch.name = req.body.name;
-    if (req.body.slug !== undefined) patch.slug = req.body.slug;
-    if (req.body.description !== undefined) patch.description = req.body.description;
-    if (req.body.priceCents !== undefined) patch.price_cents = req.body.priceCents;
-    if (req.body.currency !== undefined) patch.currency = req.body.currency;
-    if (req.body.status !== undefined) patch.status = req.body.status;
-    if (req.body.categoryId !== undefined) patch.category_id = req.body.categoryId;
-    if (req.body.sku !== undefined) patch.sku = req.body.sku;
-
-    const { data, error } = await db.from('products').update(patch).eq('id', req.params.id).select('*').single();
-    if (error) throw error;
-    res.json(data);
-  } catch (e) { next(e); }
-});
-
-r.delete('/:id', async (req, res, next) => {
-  try {
-    const db = supabaseClient('service');
-    const { error } = await db.from('products').delete().eq('id', req.params.id);
-    if (error) throw error;
-    res.status(204).send();
-  } catch (e) { next(e); }
-});
-
-r.post('/:id/images', uploadSingleImage, async (req, res, next) => {
-  try {
-    if (!req.file) { res.status(400).json({ error: 'Missing file' }); return; }
-    const db = supabaseClient('service');
-    const productId = req.params.id;
-    const { data: vendor } = await db.from('vendors').select('id').eq('user_id', req.user!.id).maybeSingle();
-    const { data: prod } = await db.from('products').select('id, vendor_id').eq('id', productId).maybeSingle();
-    if (!vendor || !prod || prod.vendor_id !== vendor.id) { res.status(403).json({ error: 'Forbidden' }); return; }
-    const bucket = 'product-assets';
-    try { await (db as any).storage.createBucket(bucket, { public: true }); } catch {}
-    const ext = (req.file.originalname.split('.').pop() || 'png').toLowerCase();
-    const filename = `img_${Date.now()}.${ext}`;
-    const path = `products/${productId}/${filename}`;
-    const uploadRes = await (db as any).storage.from(bucket).upload(path, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
-    if (uploadRes.error) throw uploadRes.error;
-    const { data: pub } = (db as any).storage.from(bucket).getPublicUrl(path);
-    const url: string | undefined = pub?.publicUrl;
-    const { data: existing } = await db.from('product_images').select('sort_order').eq('product_id', productId).order('sort_order', { ascending: false }).limit(1);
-    const nextOrder = existing && existing[0] ? (existing[0].sort_order as number) + 1 : 0;
-    const { data: row, error: insErr } = await db
-      .from('product_images')
-      .insert({ product_id: productId, image_url: url || '', sort_order: nextOrder })
-      .select('*')
-      .single();
-    if (insErr) throw insErr;
-    res.json({ image: row });
   } catch (e) { next(e); }
 });
 

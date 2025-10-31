@@ -15,19 +15,16 @@ const ProductFiltersPanel: React.FC<ProductFiltersPanelProps> = ({
   onFilterChange,
   onClearFilters,
 }) => {
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Array<{ name: string; slug: string }>>([]);
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const res = await api.get('/api/products/categories');
-        const names: string[] = (res.data?.items || []).map((c: any) => c.name);
-        if (mounted) setCategories(names);
+        const list = (res.data?.items || []).map((c: any) => ({ name: c.name, slug: c.slug }));
+        if (mounted) setCategories(list);
       } catch {
-        // fallback if DB empty
-        if (mounted) setCategories([
-          'Home & Kitchen', 'Textiles', 'Woodwork', 'Ceramics', 'Jewelry'
-        ]);
+        if (mounted) setCategories([]);
       }
     })();
     return () => { mounted = false; };
@@ -41,11 +38,11 @@ const ProductFiltersPanel: React.FC<ProductFiltersPanelProps> = ({
   ];
 
   const priceRanges = [
-    { min: 0, max: 25, label: 'Under $25' },
-    { min: 25, max: 50, label: '$25 - $50' },
-    { min: 50, max: 100, label: '$50 - $100' },
-    { min: 100, max: 200, label: '$100 - $200' },
-    { min: 200, max: undefined, label: 'Over $200' },
+    { min: 0, max: 1000, label: 'Under Nrs 1,000' },
+    { min: 1000, max: 5000, label: 'Nrs 1,000 - 5,000' },
+    { min: 5000, max: 10000, label: 'Nrs 5,000 - 10,000' },
+    { min: 10000, max: 20000, label: 'Nrs 10,000 - 20,000' },
+    { min: 20000, max: undefined, label: 'Over Nrs 20,000' },
   ];
 
   const hasActiveFilters = !!(filters.category || filters.minPrice || filters.maxPrice || filters.search);
@@ -153,18 +150,18 @@ const ProductFiltersPanel: React.FC<ProductFiltersPanelProps> = ({
       <div>
         <h4 className="font-medium text-gray-900 mb-3">Categories</h4>
         <div className="space-y-2 max-h-48 overflow-y-auto">
-          {categories.map((category) => (
-            <label key={category} className="flex items-center">
+          {categories.map((c) => (
+            <label key={c.slug} className="flex items-center">
               <input
                 type="radio"
                 name="category"
                 className="w-4 h-4 text-primary-600 focus:ring-primary-500"
-                checked={filters.category === category}
+                checked={filters.category === c.slug}
                 onChange={() => onFilterChange({ 
-                  category: filters.category === category ? '' : category 
+                  category: filters.category === c.slug ? '' : c.slug 
                 })}
               />
-              <span className="ml-2 text-sm text-gray-700">{category}</span>
+              <span className="ml-2 text-sm text-gray-700">{c.name}</span>
             </label>
           ))}
         </div>

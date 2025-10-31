@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import ProfileSection from '../../dashboard/ProfilePage';
 import UsersManagementSection from '@/dashboard/admin/UsersManagementSection';
 import PromoManagementSection from '@/dashboard/admin/PromoManagementSection';
+import CategoriesManagementSection from '@/dashboard/admin/CategoriesManagementSection';
 import VendorManagementSection from '@/dashboard/admin/VendorManagementSection';
 import SystemAnalyticsSection from '@/dashboard/admin/SystemAnalyticsSection';
 import { useAuth } from '@/context/AuthContext';
@@ -33,11 +34,12 @@ export default function AdminDashboard() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-5 w-full">
+        <TabsList className="grid grid-cols-6 w-full">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="promos">Promo Codes</TabsTrigger>
           <TabsTrigger value="vendors">Vendors</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="analytics">System Analytics</TabsTrigger>
         </TabsList>
 
@@ -81,6 +83,14 @@ export default function AdminDashboard() {
           </Card>
         </TabsContent>
         
+        <TabsContent value="categories" className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <CategoriesManagementSection />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="promos" className="space-y-4">
           <Card>
             <CardContent className="pt-6">

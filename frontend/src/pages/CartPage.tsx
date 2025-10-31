@@ -75,7 +75,7 @@ const CartPage: React.FC = () => {
                       by {item.vendorName}
                     </p>
                     <div className="text-lg font-bold text-primary-600">
-                      ${item.price}
+                      <span className="text-gray-600 mr-1">Nrs</span> {item.price.toLocaleString()}
                     </div>
                   </div>
                   
@@ -122,7 +122,7 @@ const CartPage: React.FC = () => {
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal ({itemCount} items)</span>
-                  <span className="font-medium">${total.toFixed(2)}</span>
+                  <span className="font-medium"><span className="text-gray-600 mr-1">Nrs</span>{total.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
@@ -130,12 +130,12 @@ const CartPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Tax</span>
-                  <span className="font-medium">${(total * 0.08).toFixed(2)}</span>
+                  <span className="font-medium"><span className="text-gray-600 mr-1">Nrs</span>{(total * 0.08).toLocaleString()}</span>
                 </div>
                 <hr className="border-gray-200" />
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total</span>
-                  <span className="text-primary-600">${(total * 1.08).toFixed(2)}</span>
+                  <span className="text-primary-600"><span className="text-gray-600 mr-1">Nrs</span>{(total * 1.08).toLocaleString()}</span>
                 </div>
               </div>
 

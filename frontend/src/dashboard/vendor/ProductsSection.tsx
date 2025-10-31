@@ -7,6 +7,7 @@ import { Label } from '@/components/common/label';
 import { Badge } from '@/components/common/badge';
 import { Camera, Plus, Pencil, Trash2, Upload, CheckCircle2, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { api } from '@/utils/api.client';
 
 type Row = {
   id: string;
@@ -29,6 +30,9 @@ export default function ProductsSection() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<number>(0);
   const [status, setStatus] = useState<'DRAFT'|'ACTIVE'|'INACTIVE'>('DRAFT');
+  const [file, setFile] = useState<File | null>(null);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [categoryId, setCategoryId] = useState<string | ''>('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadProductIdRef = useRef<string | null>(null);
 
@@ -49,6 +53,12 @@ export default function ProductsSection() {
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    (async () => {
+      try { const res = await api.get('/api/products/categories'); setCategories((res.data?.items || []).map((c: any) => ({ id: c.id, name: c.name }))); } catch {}
+    })();
+  }, []);
+
   const statusBadge = (s: Row['status']) => (
     <Badge variant={s === 'ACTIVE' ? 'success' : s === 'DRAFT' ? 'neutral' : 'outline'} className="uppercase text-[10px]">
       {s}
@@ -58,12 +68,17 @@ export default function ProductsSection() {
   async function onSubmit() {
     try {
       if (!name.trim() || !slug.trim()) { toast.error('Name and slug are required'); return; }
+      if (!editing && !file) { toast.error('Please select a product image'); return; }
       if (editing) {
-        await VendorProductsApi.update(editing.id, { name, slug, description, price, status });
+        await VendorProductsApi.update(editing.id, { name, slug, description, price, status, categoryId: categoryId || null });
         toast.success('Product updated');
       } else {
-        await VendorProductsApi.create({ name, slug, description, price, status });
+        const created = await VendorProductsApi.create({ name, slug, description, price, status, categoryId: categoryId || null });
         toast.success('Product created');
+        if (file) {
+          await VendorProductsApi.uploadImage(created.id, file);
+          toast.success('Image uploaded');
+        }
       }
       setOpenForm(false); resetForm();
       await load();
@@ -107,7 +122,8 @@ export default function ProductsSection() {
 
       <div className="rounded-lg border bg-white">
         <div className="grid grid-cols-12 px-4 py-2 text-xs font-medium text-gray-500 border-b">
-          <div className="col-span-4">Name</div>
+          <div className="col-span-1">Image</div>
+          <div className="col-span-3">Name</div>
           <div className="col-span-2">Slug</div>
           <div className="col-span-2">Price</div>
           <div className="col-span-2">Status</div>
@@ -120,7 +136,14 @@ export default function ProductsSection() {
         ) : (
           items.map((row) => (
             <div key={row.id} className="grid grid-cols-12 px-4 py-3 items-center border-t">
-              <div className="col-span-4">
+              <div className="col-span-1">
+                { (row as any).product_images?.length ? (
+                  <img src={(row as any).product_images[0]?.image_url} alt="thumb" className="h-10 w-10 rounded object-cover border" />
+                ) : (
+                  <div className="h-10 w-10 rounded bg-gray-100 border" />
+                )}
+              </div>
+              <div className="col-span-3">
                 <div className="font-medium text-gray-900">{row.name}</div>
                 <div className="text-xs text-gray-500">Updated {new Date(row.updated_at).toLocaleDateString()}</div>
               </div>
@@ -158,18 +181,33 @@ export default function ProductsSection() {
               <Label htmlFor="desc">Description</Label>
               <textarea id="desc" className="w-full border rounded-md p-2 h-24" value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
-            <div>
-              <Label htmlFor="price">Price</Label>
-              <Input id="price" type="number" step="0.01" min="0" value={isNaN(price)? '': String(price)} onChange={(e) => setPrice(parseFloat(e.target.value))} />
-            </div>
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <select id="status" className="w-full border rounded-md h-10 px-2" value={status} onChange={(e) => setStatus(e.target.value as any)}>
-                <option value="DRAFT">Draft</option>
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
-              </select>
-            </div>
+                <div>
+                  <Label htmlFor="price">Price</Label>
+                  <Input id="price" type="number" step="0.01" min="0" value={isNaN(price)? '': String(price)} onChange={(e) => setPrice(parseFloat(e.target.value))} />
+                </div>
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <select id="status" className="w-full border rounded-md h-10 px-2" value={status} onChange={(e) => setStatus(e.target.value as any)}>
+                    <option value="DRAFT">Draft</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <select id="category" className="w-full border rounded-md h-10 px-2" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                    <option value="">Uncategorized</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {!editing && (
+                  <div className="md:col-span-2">
+                    <Label htmlFor="image">Main image</Label>
+                    <input id="image" type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} className="block w-full border rounded-md p-2" />
+                  </div>
+                )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenForm(false)}>Cancel</Button>

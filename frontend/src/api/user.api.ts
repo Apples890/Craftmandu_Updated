@@ -5,6 +5,7 @@ export type UpdateProfilePayload = {
   fullName?: string;
   phone?: string | null;
   avatarUrl?: string | null;
+  shippingAddress?: { address: string; province: string; district: string };
 };
 
 export type ChangePasswordPayload = {

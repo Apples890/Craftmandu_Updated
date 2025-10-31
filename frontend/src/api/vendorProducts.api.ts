@@ -6,6 +6,7 @@ export type VendorProductPayload = {
   description?: string | null;
   price: number; // major units
   status: 'DRAFT' | 'ACTIVE' | 'INACTIVE';
+  categoryId?: string | null;
 };
 
 export const VendorProductsApi = {
@@ -20,8 +21,9 @@ export const VendorProductsApi = {
       description: p.description ?? null,
       priceCents: Math.round((p.price || 0) * 100),
       status: p.status,
+      categoryId: p.categoryId ?? null,
     });
-    return res.data;
+    return res.data as { id: string };
   },
   async update(id: string, p: Partial<VendorProductPayload>) {
     const body: any = {};
@@ -30,6 +32,7 @@ export const VendorProductsApi = {
     if (p.description !== undefined) body.description = p.description;
     if (p.price !== undefined) body.priceCents = Math.round((p.price || 0) * 100);
     if (p.status !== undefined) body.status = p.status;
+    if (p.categoryId !== undefined) body.categoryId = p.categoryId ?? null;
     const res = await api.patch(`/api/products/${id}`, body);
     return res.data;
   },
@@ -45,4 +48,3 @@ export const VendorProductsApi = {
     return res.data?.image;
   },
 };
-
