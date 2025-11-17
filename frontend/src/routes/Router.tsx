@@ -16,6 +16,7 @@ import SetupUsernamePage from '../pages/auth/SetupUsernamePage';
 
 import VendorDashboard from '../pages/profile/VendorDashboard';
 import AdminDashboard from '../pages/profile/AdminDashboard';
+import BannedUsersPage from '@/dashboard/admin/BannedUsersPage';
 import CustomerDashboard from '../pages/profile/CustomerDashboard';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import ProfileRedirect from '../pages/profile/ProfileRedirect';
@@ -30,10 +31,10 @@ const AppRoutes: React.FC = () => {
       <Route path="/browse" element={<BrowsePage />} />
       <Route path="/product/:slug" element={<ProductDetailPage />} />
 
-      <Route path="/cart" element={<CartPage />} />
-      <Route path="/checkout" element={<CheckoutPage />} />
-      <Route path="/orders" element={<OrderHistoryPage />} />
-      <Route path="/messages" element={<MessagesPage />} />
+      <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+      <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+      <Route path="/orders" element={<ProtectedRoute><OrderHistoryPage /></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
 
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -53,6 +54,14 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute role="admin">
             <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/banned-users"
+        element={
+          <ProtectedRoute role="admin">
+            <BannedUsersPage />
           </ProtectedRoute>
         }
       />

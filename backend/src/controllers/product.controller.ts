@@ -4,14 +4,28 @@ import { ProductService } from '@/services/product.service';
 import { productCreateSchema, productUpdateSchema } from '@/validators/product.validator';
 import { validateInput } from '@/utils/validation.utils';
 
+
 export const ProductController = {
-  async list(req: Request, res: Response, next: NextFunction) {
-    try {
-      const limit = Number(req.query.limit ?? 20);
-      const items = await ProductService.list(limit);
-      res.json({ items });
-    } catch (err) { next(err); }
-  },
+async list(req: Request, res: Response, next: NextFunction) {
+  try {
+    const filters = {
+      search: req.query.search as string,
+      category: req.query.category as string,
+      minPrice: req.query.minPriceCents ? Number(req.query.minPriceCents) / 100 : undefined,
+      maxPrice: req.query.maxPriceCents ? Number(req.query.maxPriceCents) / 100 : undefined,
+      sortBy: req.query.sortBy as 'price' | 'rating' | 'newest',
+    };
+
+    const limit = Number(req.query.limit ?? 50);
+
+    const items = await ProductService.list(filters, limit);
+
+    res.json({ items });
+  } catch (err) {
+    next(err);
+  }
+},
+
 
   async getBySlug(req: Request, res: Response, next: NextFunction) {
     try {

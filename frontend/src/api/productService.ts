@@ -36,7 +36,7 @@ export interface ProductFilters {
   category?: string;
   minPrice?: number;
   maxPrice?: number;
-  sortBy?: 'price' | 'rating' | 'newest' | 'popularity';
+  sortBy?: 'price' | 'rating' | 'newest';
   search?: string;
 }
 
@@ -47,25 +47,43 @@ export const productService = {
     if (filters?.category) params.category = filters.category; // slug
     if (filters?.minPrice !== undefined) params.minPriceCents = Math.round(Number(filters.minPrice) * 100);
     if (filters?.maxPrice !== undefined) params.maxPriceCents = Math.round(Number(filters.maxPrice) * 100);
-    if (filters?.sortBy) params.sortBy = filters.sortBy === 'rating' || filters.sortBy === 'popularity' ? 'newest' : filters.sortBy;
+    if (filters?.sortBy) params.sortBy = filters.sortBy === 'rating' || filters.sortBy === 'price' ? 'newest' : filters.sortBy;
 
     const response = await api.get('/products', { params });
     const items = response.data?.items || [];
-    const mapped = items.map((it: any) => {
+
+    const mapped: Product[] = items.map((it: any) => {
       const priceCents = typeof it.price_cents === 'number' ? it.price_cents : 0;
-      const image = it.image_url || (it.product_images && it.product_images[0]?.image_url) || '';
+
+      const images: string[] = it.product_images?.map((img: any) => img.image_url) ||
+        (it.image_url ? [it.image_url] : [
+          'https://images.unsplash.com/photo-1523419409543-a6d49002b6aa?q=80&w=800&auto=format&fit=crop'
+        ]);
+
       const vendorName = it.vendor?.shop_name || 'Vendor';
+      const vendorId = it.vendor?.id || '';
       const categoryName = it.category?.name || 'General';
+
       return {
         id: it.slug || it.id,
-        name: it.name,
+        title: it.name,
+        name: it.name, // optional, if ProductCard uses this
+        description: it.description || '',
         price: Math.round(priceCents / 100),
-        image,
-        rating: Number(it.avg_rating ?? it.average_rating ?? 0),
-        vendor: vendorName,
         category: categoryName,
+        images,
+        quantity: it.inventory?.qty_available ?? 0,
+        vendorId,
+        vendorName,
+        vendorShop: vendorName,
+        regionTag: it.regionTag || undefined,
+        ratings: it.ratings || [],
+        averageRating: Number(it.avg_rating ?? it.average_rating ?? 0),
+        reviewCount: Number(it.review_count ?? 0),
+        createdAt: it.created_at,
       } as Product;
     });
+
     return { products: mapped };
   },
 

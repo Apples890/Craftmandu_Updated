@@ -1,11 +1,14 @@
 import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
 import { Trash2, ShoppingCart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 
 export default function WishlistSection() {
   const { items, remove, clear } = useWishlist();
   const { addToCart } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   if (items.length === 0) {
     return (
@@ -37,7 +40,7 @@ export default function WishlistSection() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => addToCart({ id: it.id, name: it.name, price: Math.round((it.priceCents||0)/100), image: it.imageUrl, quantity: 1 })}
+                onClick={() => { if (!user) { navigate(`/login?redirect=${encodeURIComponent('/dashboard')}`); return; } addToCart({ id: it.id, name: it.name, price: Math.round((it.priceCents||0)/100), image: it.imageUrl, quantity: 1 }); }}
                 className="btn-primary flex items-center gap-1"
                 title="Add to cart"
               >

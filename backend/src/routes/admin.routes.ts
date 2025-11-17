@@ -23,13 +23,13 @@ r.get('/stats', async (_req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// List users (basic fields + moderation flags)
+// List users (basic fields + is_banned flag)
 r.get('/users', async (_req, res, next) => {
   try {
     const db = supabaseClient('service');
     const { data, error } = await db
       .from('users')
-      .select('id, email, full_name, role, is_banned, banned_until, ban_reason, can_chat, can_order, can_review, created_at, updated_at')
+      .select('id, email, full_name, role, is_banned, created_at, updated_at')
       .order('created_at', { ascending: false });
     if (error) throw error;
     res.json({ items: data || [] });
@@ -149,7 +149,8 @@ r.post('/categories', validate({ body: catSchema }), async (req, res, next) => {
 r.get('/analytics', async (req, res, next) => {
   try {
     const db = supabaseClient('service');
-    const days = Math.max(1, Math.min(365, Number(req.query.days || 30)));
+    const raw = Number.parseInt(String(req.query.days ?? ''), 10);
+    const days = Number.isFinite(raw) && raw > 0 ? Math.min(365, raw) : 30;
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const { data, error } = await db
       .from('orders')
@@ -172,5 +173,40 @@ r.get('/analytics', async (req, res, next) => {
     }
     const series = Object.values(map).sort((a,b) => a.date.localeCompare(b.date));
     res.json({ revenue_cents, orders: orders.length, by_status, series, days });
+  } catch (e) { next(e); }
+});
+
+// Create vendor profile for a user (promote to vendor)
+const createVendorSchema = z.object({
+  userId: z.string().uuid(),
+  shopName: z.string().min(2).optional(),
+  status: z.enum(['PENDING','APPROVED','SUSPENDED']).optional(),
+});
+r.post('/vendors/create', validate({ body: createVendorSchema }), async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const { userId, shopName, status } = req.body;
+    const { data, error } = await db.rpc('promote_to_vendor', {
+      p_user_id: userId,
+      p_shop_name: shopName ?? null,
+      p_status: status ?? 'PENDING',
+    });
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (e) { next(e); }
+});
+
+// Delete vendor profile (and downgrade role to CUSTOMER)
+r.delete('/vendors/:id', async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const { data: v, error: vErr } = await db.from('vendors').select('id, user_id').eq('id', req.params.id).single();
+    if (vErr) throw vErr;
+    const { error: delErr } = await db.from('vendors').delete().eq('id', req.params.id);
+    if (delErr) throw delErr;
+    if (v?.user_id) {
+      await db.from('users').update({ role: 'CUSTOMER' }).eq('id', v.user_id);
+    }
+    res.status(204).send();
   } catch (e) { next(e); }
 });

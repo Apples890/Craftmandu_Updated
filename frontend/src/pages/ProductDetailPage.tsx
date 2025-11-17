@@ -22,6 +22,7 @@ import toast from 'react-hot-toast';
 import { useWishlist } from '@/context/WishlistContext';
 import { ChatApi } from '@/api/chat.api';
 import { useAuthStore } from '@/store/authStore';
+import ReviewsSection from '@/components/review/ReviewsSection';
 
 const ProductDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -61,7 +62,10 @@ const ProductDetailPage: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!product) return;
-    
+    if (!user) {
+      navigate(`/login?redirect=${encodeURIComponent(`/product/${slug}`)}`);
+      return;
+    }
     for (let i = 0; i < quantity; i++) {
       addToCart({
         id: product.id,
@@ -73,7 +77,6 @@ const ProductDetailPage: React.FC = () => {
         vendorName: product.vendorName,
       });
     }
-    
     toast.success(`Added ${quantity} item(s) to cart!`);
   };
 
@@ -393,48 +396,9 @@ const ProductDetailPage: React.FC = () => {
         </div>
 
         {/* Reviews Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-16"
-        >
-          <div className="card p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Customer Reviews</h2>
-            
-            <div className="flex items-center space-x-8 mb-8">
-              <div className="text-center">
-                <div className="text-4xl font-bold text-gray-900 mb-2">
-                  {product.averageRating?.toFixed(1) || '5.0'}
-                </div>
-                <div className="flex text-yellow-400 mb-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-5 h-5 ${
-                        i < Math.floor(product.averageRating || 0)
-                          ? 'fill-current'
-                          : 'stroke-current fill-transparent'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <div className="text-sm text-gray-600">
-                  Based on {product.reviewCount || 0} reviews
-                </div>
-              </div>
-            </div>
-
-            {user && (
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Write a Review</h3>
-                <div className="bg-gray-50 rounded-lg p-4 text-center text-gray-600">
-                  Review functionality will be implemented with the backend integration.
-                </div>
-              </div>
-            )}
-          </div>
-        </motion.div>
+        <div className="mt-16">
+          <ReviewsSection productId={product.id} productSlug={slug} />
+        </div>
       </div>
     </div>
   );

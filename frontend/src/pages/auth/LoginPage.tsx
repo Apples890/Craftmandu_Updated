@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthStore } from '../../store/authStore';
@@ -11,6 +11,12 @@ const LoginPage: React.FC = () => {
   const authError = useAuthStore((s) => s.error);
   const status = useAuthStore((s) => s.status);
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirect = (() => {
+    const params = new URLSearchParams(location.search);
+    const r = params.get('redirect');
+    return r && r.startsWith('/') ? r : '/';
+  })();
 
 
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -38,7 +44,7 @@ const LoginPage: React.FC = () => {
       if (!formData.password) throw { password: 'Password is required' };
 
       await loginAction(formData.email, formData.password);
-      navigate('/', { replace: true });
+      navigate(redirect, { replace: true });
       // navigate('/cart');
     } catch (err: any) {
       setErrors(err);

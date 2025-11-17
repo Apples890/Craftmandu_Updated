@@ -5,17 +5,15 @@ import { supabaseClient } from '@/config/database.config';
 type Action = 'chat' | 'order' | 'review';
 
 function isBanActive(u: any): boolean {
-  const hard = Boolean(u?.is_banned);
-  const until = u?.banned_until ? new Date(u.banned_until) : null;
-  const timed = until ? until.getTime() > Date.now() : false;
-  return hard || timed;
+  // Simplified: only check the is_banned flag
+  return Boolean(u?.is_banned);
 }
 
 export async function fetchUserModeration(userId: string) {
   const db = supabaseClient('service');
   const { data, error } = await db
     .from('users')
-    .select('id, is_banned, banned_until, can_chat, can_order, can_review')
+    .select('id, is_banned')
     .eq('id', userId)
     .single();
   if (error) throw error;

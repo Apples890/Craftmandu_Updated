@@ -4,7 +4,7 @@ import { authMiddleware } from '@/middleware/auth.middleware';
 import { supabaseClient } from '@/config/database.config';
 import { z } from 'zod';
 import { validate } from '@/middleware/validation.middleware';
-import { requireNotBanned, requireCan } from '@/middleware/moderation.middleware';
+import { requireNotBanned } from '@/middleware/moderation.middleware';
 import { requireRole } from '@/middleware/role.middleware';
 
 const r = Router();
@@ -17,7 +17,7 @@ const checkoutSchema = z.object({
   payment: z.object({ method: z.enum(['COD','WALLET']), wallet: z.enum(['ESEWA','KHALTI']).optional() }),
 });
 
-r.post('/checkout', requireNotBanned(), requireCan('order'), validate({ body: checkoutSchema }), async (req, res, next): Promise<void> => {
+r.post('/checkout', requireNotBanned(), validate({ body: checkoutSchema }), async (req, res, next): Promise<void> => {
   try {
     const db = supabaseClient('service');
     const items: Array<{ product: string; qty: number }> = req.body.items || [];
@@ -178,7 +178,8 @@ export default r;
 r.get('/vendor/summary', requireRole('VENDOR'), async (req, res, next) => {
   try {
     const db = supabaseClient('service');
-    const days = Math.max(1, Math.min(365, Number(req.query.days || 30)));
+    const raw = Number.parseInt(String(req.query.days ?? ''), 10);
+    const days = Number.isFinite(raw) && raw > 0 ? Math.min(365, raw) : 30;
     const { data: v } = await db.from('vendors').select('id').eq('user_id', req.user!.id).maybeSingle();
     if (!v) { res.json({ revenue_cents: 0, orders: 0, by_status: {}, series: [] }); return; }
 

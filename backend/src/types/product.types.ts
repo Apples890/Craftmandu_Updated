@@ -1,6 +1,17 @@
 // types/product.types.ts
 export type ProductStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE';
 
+// types/productFilters.types.ts
+
+export interface ProductFilters {
+  search?: string;
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sortBy?: 'price' | 'rating' | 'newest';
+}
+
+
 export interface ProductDbRow {
   id: string;
   vendor_id: string;

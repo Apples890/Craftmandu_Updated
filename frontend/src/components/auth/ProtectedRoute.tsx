@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '@/utils/api.client';
 
@@ -10,6 +10,7 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, role }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
   const [vendorStatus, setVendorStatus] = useState<'APPROVED' | 'PENDING' | 'SUSPENDED' | 'UNKNOWN'>('UNKNOWN');
   const [checkingVendor, setCheckingVendor] = useState(false);
 
@@ -22,7 +23,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, role }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    const redirect = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
 
   const userRole = typeof user.role === 'string' ? user.role.toString().toLowerCase() : '';
