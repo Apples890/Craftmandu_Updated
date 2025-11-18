@@ -1,10 +1,33 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Filter, Grid, List, SlidersHorizontal } from 'lucide-react';
 import { productService, Product, ProductFilters } from '../services/productService';
 import ProductCard from '../components/product/ProductCard';
 import ProductFiltersPanel from '../components/product/ProductFiltersPanel';
+
+const sortProducts = (
+  items: Product[],
+  sortBy: ProductFilters['sortBy'] = 'newest'
+) => {
+  const list = [...items];
+  switch (sortBy) {
+    case 'price':
+      return list.sort((a, b) => a.price - b.price);
+    case 'rating':
+      return list.sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
+    case 'popularity':
+      return list.sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0));
+    default: {
+      const getTime = (p: Product) => {
+        if (!p.createdAt) return 0;
+        const timestamp = new Date(p.createdAt).getTime();
+        return Number.isNaN(timestamp) ? 0 : timestamp;
+      };
+      return list.sort((a, b) => getTime(b) - getTime(a));
+    }
+  }
+};
 
 const BrowsePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -60,7 +83,8 @@ const BrowsePage: React.FC = () => {
     setLoading(true);
     try {
       const response = await productService.getProducts(filters);
-      setProducts(response.products || []);
+      const sorted = sortProducts(response.products || [], filters.sortBy);
+      setProducts(sorted);
     } catch (error) {
       console.error('Failed to load products:', error);
     } finally {

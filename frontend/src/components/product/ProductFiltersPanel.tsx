@@ -150,6 +150,16 @@ const ProductFiltersPanel: React.FC<ProductFiltersPanelProps> = ({
       <div>
         <h4 className="font-medium text-gray-900 mb-3">Categories</h4>
         <div className="space-y-2 max-h-48 overflow-y-auto">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              name="category"
+              className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+              checked={!filters.category}
+              onChange={() => onFilterChange({ category: '' })}
+            />
+            <span className="ml-2 text-sm text-gray-700">All categories</span>
+          </label>
           {categories.map((c) => (
             <label key={c.slug} className="flex items-center">
               <input
@@ -158,7 +168,7 @@ const ProductFiltersPanel: React.FC<ProductFiltersPanelProps> = ({
                 className="w-4 h-4 text-primary-600 focus:ring-primary-500"
                 checked={filters.category === c.slug}
                 onChange={() => onFilterChange({ 
-                  category: filters.category === c.slug ? '' : c.slug 
+                  category: c.slug 
                 })}
               />
               <span className="ml-2 text-sm text-gray-700">{c.name}</span>

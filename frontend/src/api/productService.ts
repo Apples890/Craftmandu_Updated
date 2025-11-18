@@ -36,7 +36,7 @@ export interface ProductFilters {
   category?: string;
   minPrice?: number;
   maxPrice?: number;
-  sortBy?: 'price' | 'rating' | 'newest';
+  sortBy?: 'price' | 'rating' | 'newest' | 'popularity';
   search?: string;
 }
 
@@ -47,7 +47,7 @@ export const productService = {
     if (filters?.category) params.category = filters.category; // slug
     if (filters?.minPrice !== undefined) params.minPriceCents = Math.round(Number(filters.minPrice) * 100);
     if (filters?.maxPrice !== undefined) params.maxPriceCents = Math.round(Number(filters.maxPrice) * 100);
-    if (filters?.sortBy) params.sortBy = filters.sortBy === 'rating' || filters.sortBy === 'price' ? 'newest' : filters.sortBy;
+    if (filters?.sortBy) params.sortBy = filters.sortBy;
 
     const response = await api.get('/products', { params });
     const items = response.data?.items || [];

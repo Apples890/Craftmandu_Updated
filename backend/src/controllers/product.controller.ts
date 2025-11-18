@@ -11,9 +11,9 @@ async list(req: Request, res: Response, next: NextFunction) {
     const filters = {
       search: req.query.search as string,
       category: req.query.category as string,
-      minPrice: req.query.minPriceCents ? Number(req.query.minPriceCents) / 100 : undefined,
-      maxPrice: req.query.maxPriceCents ? Number(req.query.maxPriceCents) / 100 : undefined,
-      sortBy: req.query.sortBy as 'price' | 'rating' | 'newest',
+      minPrice: req.query.minPriceCents ? Number(req.query.minPriceCents) : undefined,
+      maxPrice: req.query.maxPriceCents ? Number(req.query.maxPriceCents) : undefined,
+      sortBy: req.query.sortBy as 'price' | 'rating' | 'newest' | 'popularity',
     };
 
     const limit = Number(req.query.limit ?? 50);

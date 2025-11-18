@@ -8,7 +8,7 @@ export interface ProductFilters {
   category?: string;
   minPrice?: number;
   maxPrice?: number;
-  sortBy?: 'price' | 'rating' | 'newest';
+  sortBy?: 'price' | 'rating' | 'newest' | 'popularity';
 }
 
 

@@ -8,7 +8,18 @@ import { validate, paginationSchema } from '@/middleware/validation.middleware';
 import { z } from 'zod';
 import { uploadSingleImage } from '@/middleware/upload.middleware';
 
+
 const r = Router();
+
+const productListQuerySchema = paginationSchema
+  .extend({
+    search: z.string().trim().optional(),
+    category: z.string().trim().optional(),
+    minPriceCents: z.coerce.number().int().min(0).optional(),
+    maxPriceCents: z.coerce.number().int().min(0).optional(),
+    sortBy: z.enum(['newest', 'price', 'rating', 'popularity']).optional(),
+  })
+  .partial();
 
 // Dev-only seeding endpoint to create a demo vendor and sample products
 if (process.env.NODE_ENV !== 'production') {
@@ -89,7 +100,7 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 // Public list with filters
-r.get('/', validate({ query: paginationSchema.partial() }), async (req, res, next) => {
+r.get('/', validate({ query: productListQuerySchema }), async (req, res, next) => {
   try {
     const db = supabaseClient('service');
     const limit = Number(req.query['limit'] || 20);
@@ -118,8 +129,11 @@ r.get('/', validate({ query: paginationSchema.partial() }), async (req, res, nex
     if (minCents !== undefined) q = q.gte('price_cents', minCents);
     if (maxCents !== undefined) q = q.lte('price_cents', maxCents);
 
-    if (sortBy === 'price') q = q.order('price_cents', { ascending: true });
-    else q = q.order('created_at', { ascending: false });
+    if (sortBy === 'price') {
+      q = q.order('price_cents', { ascending: true });
+    } else {
+      q = q.order('created_at', { ascending: false });
+    }
 
     q = q.limit(limit);
 
@@ -305,5 +319,4 @@ r.get('/:slug', async (req, res, next) => {
     });
   } catch (e) { next(e); }
 });
-
 export default r;

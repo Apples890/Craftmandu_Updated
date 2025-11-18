@@ -25,24 +25,17 @@ async list(filters: ProductFilters = {}, limit = 50) {
 
   // Price filter
   if (filters.minPrice !== undefined) {
-    query = query.gte('price_cents', filters.minPrice * 100);
+    query = query.gte('price_cents', filters.minPrice);
   }
   if (filters.maxPrice !== undefined) {
-    query = query.lte('price_cents', filters.maxPrice * 100);
+    query = query.lte('price_cents', filters.maxPrice);
   }
 
   // Sorting
-  switch (filters.sortBy) {
-    case 'price':
-      query = query.order('price_cents', { ascending: true });
-      break;
-    case 'rating':
-      query = query.order('avg_rating', { ascending: false });
-      break;
-    case 'newest':
-    default:
-      query = query.order('created_at', { ascending: false });
-      break;
+  if (filters.sortBy === 'price') {
+    query = query.order('price_cents', { ascending: true });
+  } else {
+    query = query.order('created_at', { ascending: false });
   }
 
   const { data, error } = await query.limit(limit);
