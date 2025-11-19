@@ -10,6 +10,7 @@ export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6).max(100),
   fullName: z.string().min(1).max(120),
+  role: z.enum(['customer','vendor']).optional(),
 });
 
 export const resetPasswordSchema = z.object({

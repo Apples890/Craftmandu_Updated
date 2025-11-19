@@ -12,9 +12,10 @@ const ProfileRedirect: React.FC = () => {
     (async () => {
       if (!user || String(user.role || '').toLowerCase() === 'admin') { setIsVendor(false); return; }
       try {
-        const { data } = await api.get('/api/vendors/me');
+        const { data } = await api.get('/api/vendors/status/me');
         if (!mounted) return;
-        setIsVendor(!!data?.id);
+        const status = (data?.status as string | undefined) || 'NONE';
+        setIsVendor(status === 'APPROVED');
       } catch {
         if (mounted) setIsVendor(false);
       }

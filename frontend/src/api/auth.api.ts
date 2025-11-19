@@ -1,7 +1,7 @@
 // api/auth.api.ts
 import { request } from './_base';
 
-export type RegisterPayload = { email: string; password: string; fullName: string };
+export type RegisterPayload = { email: string; password: string; fullName: string; role?: 'customer' | 'vendor' };
 export type LoginPayload = { email: string; password: string };
 
 export const AuthApi = {
@@ -24,7 +24,7 @@ export const AuthApi = {
   login(payload: LoginPayload) {
     return request<{ user: any; token: string }>('/api/auth/login', 'POST', payload);
   },
-  refresh() {
-    return request<{ token: string }>('/api/auth/refresh', 'POST');
+  refresh(token: string) {
+    return request<{ token: string }>('/api/auth/refresh', 'POST', undefined, token);
   },
 };

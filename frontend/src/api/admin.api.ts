@@ -16,18 +16,9 @@ export const AdminApi = {
       email: string;
       full_name: string;
       role: 'ADMIN'|'VENDOR'|'CUSTOMER';
-      is_banned?: boolean;
       created_at: string;
       updated_at?: string;
     }>;
-  },
-  async banUser(id: string, payload: { banned: boolean; until?: string | null; reason?: string | null }) {
-    const res = await api.patch(`/api/admin/users/${id}/ban`, {
-      banned: payload.banned,
-      until: payload.until ?? null,
-      reason: payload.reason ?? null,
-    });
-    return res.data;
   },
   async vendors() {
     const res = await api.get('/api/admin/vendors');
@@ -37,9 +28,20 @@ export const AdminApi = {
     const res = await api.patch(`/api/admin/vendors/${id}/status`, { status });
     return res.data;
   },
-  async createCategory(name: string, slug: string) {
-    const res = await api.post('/api/admin/categories', { name, slug });
+  async categories() {
+    const res = await api.get('/api/admin/categories');
+    return res.data?.items as Array<{ id: string; name: string; slug: string }>;
+  },
+  async createCategory(name: string) {
+    const res = await api.post('/api/admin/categories', { name });
     return res.data;
+  },
+  async updateCategory(id: string, name: string) {
+    const res = await api.patch(`/api/admin/categories/${id}`, { name });
+    return res.data;
+  },
+  async deleteCategory(id: string) {
+    await api.delete(`/api/admin/categories/${id}`);
   },
   async promoteToVendor(userId: string, shopName?: string, status: 'PENDING'|'APPROVED'|'SUSPENDED' = 'PENDING') {
     const res = await api.post('/api/admin/vendors/create', { userId, shopName, status });

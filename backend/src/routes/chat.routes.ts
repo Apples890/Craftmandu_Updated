@@ -4,7 +4,6 @@ import { authMiddleware } from '@/middleware/auth.middleware';
 import { supabaseClient } from '@/config/database.config';
 import { z } from 'zod';
 import { validate } from '@/middleware/validation.middleware';
-import { requireNotBanned } from '@/middleware/moderation.middleware';
 
 const r = Router();
 r.use(authMiddleware);
@@ -14,7 +13,7 @@ const convSchema = z.object({
   vendorId: z.string().uuid(),
   productId: z.string().uuid().nullable().optional(),
 });
-r.post('/conversations', requireNotBanned(), validate({ body: convSchema }), async (req, res, next) => {
+r.post('/conversations', validate({ body: convSchema }), async (req, res, next) => {
   try {
     const db = supabaseClient('service');
     const { data, error } = await db
@@ -35,7 +34,7 @@ r.post('/conversations', requireNotBanned(), validate({ body: convSchema }), asy
 });
 
 // List conversations for current user (customer or vendor)
-r.get('/conversations', requireNotBanned(), async (req, res, next) => {
+r.get('/conversations', async (req, res, next) => {
   try {
     const db = supabaseClient('service');
     const { data: vend } = await db.from('vendors').select('id').eq('user_id', req.user!.id).maybeSingle();
@@ -77,7 +76,7 @@ const messageSchema = z.object({
   conversationId: z.string().uuid(),
   content: z.string().min(1).max(4000),
 });
-r.post('/messages', requireNotBanned(), validate({ body: messageSchema }), async (req, res, next) => {
+r.post('/messages', validate({ body: messageSchema }), async (req, res, next) => {
   try {
     const db = supabaseClient('service');
     const { data, error } = await db
@@ -94,7 +93,7 @@ r.post('/messages', requireNotBanned(), validate({ body: messageSchema }), async
   } catch (e) { next(e); }
 });
 
-r.get('/messages/:conversationId', requireNotBanned(), async (req, res, next) => {
+r.get('/messages/:conversationId', async (req, res, next) => {
   try {
     const db = supabaseClient('service');
     const { data, error } = await db

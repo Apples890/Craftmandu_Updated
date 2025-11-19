@@ -58,8 +58,8 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
     setResetError('');
     try {
-      if (!resetEmail) throw new Error('Email is required');
-      await sendPasswordResetEmail(resetEmail);
+      if (!resetEmail.trim()) throw new Error('Email is required');
+      await sendPasswordResetEmail(resetEmail.trim());
       setResetSent(true);
     } catch (err: any) {
       setResetError(err.message || 'Error sending reset link');
@@ -88,6 +88,7 @@ const LoginPage: React.FC = () => {
               setShowForgotPassword(false);
               setResetSent(false);
               setResetError('');
+              setResetEmail('');
             }} className="flex items-center text-sm text-gray-600 hover:text-red-600 mb-6 transition-colors">
               <ArrowLeft className="h-4 w-4 mr-1" /> Back to login
             </button>

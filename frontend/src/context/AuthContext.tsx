@@ -11,7 +11,7 @@ type AuthContextType = {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string, role?: 'customer' | 'vendor') => Promise<void>;
   logout: () => void;
   recoverSession: () => Promise<void>;
   sendPasswordResetEmail: (email: string) => Promise<void>;
@@ -89,7 +89,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               className="text-sm font-medium text-white bg-gradient-to-r from-red-600 to-orange-600 px-3 py-1.5 rounded-md"
               onClick={async () => {
                 try {
-                  const { token: newToken } = await AuthApi.refresh();
+                  const current = useAuthStore.getState().token;
+                  if (!current) throw new Error('Missing session token');
+                  const { token: newToken } = await AuthApi.refresh(current);
                   useAuthStore.getState().setToken(newToken);
                   await useAuthStore.getState().refreshProfile();
                   toast.dismiss(t.id);

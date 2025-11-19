@@ -4,7 +4,6 @@ import { authMiddleware } from '@/middleware/auth.middleware';
 import { supabaseClient } from '@/config/database.config';
 import { z } from 'zod';
 import { validate } from '@/middleware/validation.middleware';
-import { requireNotBanned } from '@/middleware/moderation.middleware';
 
 const r = Router();
 
@@ -38,7 +37,7 @@ const createSchema = z.object({
   comment: z.string().max(2000).nullable().optional(),
   orderId: z.string().uuid().optional(),
 });
-r.post('/', authMiddleware, requireNotBanned(), validate({ body: createSchema }), async (req, res, next) => {
+r.post('/', authMiddleware, validate({ body: createSchema }), async (req, res, next) => {
   try {
     const userId = req.user!.id;
     const dbSrv = supabaseClient('service');

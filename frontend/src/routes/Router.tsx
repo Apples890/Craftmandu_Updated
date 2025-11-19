@@ -16,7 +16,6 @@ import SetupUsernamePage from '../pages/auth/SetupUsernamePage';
 
 import VendorDashboard from '../pages/profile/VendorDashboard';
 import AdminDashboard from '../pages/profile/AdminDashboard';
-import BannedUsersPage from '@/dashboard/admin/BannedUsersPage';
 import CustomerDashboard from '../pages/profile/CustomerDashboard';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import ProfileRedirect from '../pages/profile/ProfileRedirect';
@@ -54,14 +53,6 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute role="admin">
             <AdminDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/banned-users"
-        element={
-          <ProtectedRoute role="admin">
-            <BannedUsersPage />
           </ProtectedRoute>
         }
       />

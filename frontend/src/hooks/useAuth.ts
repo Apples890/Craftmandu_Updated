@@ -26,7 +26,7 @@ export function useAuth(_initialToken?: string) {
     error,
     refresh: refreshProfile,
     login: (payload: LoginPayload) => loginAction(payload.email, payload.password),
-    register: (payload: RegisterPayload) => registerAction(payload.email, payload.password, payload.fullName),
+    register: (payload: RegisterPayload) => registerAction(payload.email, payload.password, payload.fullName, payload.role),
     logout: logoutAction,
   };
 }

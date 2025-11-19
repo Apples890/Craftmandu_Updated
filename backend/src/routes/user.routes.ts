@@ -88,6 +88,10 @@ r.post('/change-password', validate({ body: changePwdSchema }), async (req, res,
     if (error || !userRow) { res.status(404).json({ error: 'User not found' }); return; }
     const ok = await comparePassword(req.body.currentPassword, userRow.password_hash);
     if (!ok) { res.status(401).json({ error: 'Invalid current password' }); return; }
+    if (req.body.currentPassword === req.body.newPassword) {
+      res.status(400).json({ error: 'New password must be different from the current password' });
+      return;
+    }
     const newHash = await hashPassword(req.body.newPassword);
     const { error: updErr } = await db.from('users').update({ password_hash: newHash }).eq('id', req.user!.id);
     if (updErr) throw updErr;

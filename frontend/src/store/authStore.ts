@@ -13,7 +13,7 @@ type AuthState = {
   setToken: (t?: string) => void;
   refreshProfile: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string, role?: 'customer' | 'vendor') => Promise<void>;
   logout: () => void;
 };
 
@@ -55,10 +55,10 @@ export const useAuthStore = create<AuthState>()(
           throw e;
         }
       },
-      async register(email, password, fullName) {
+      async register(email, password, fullName, role = 'customer') {
         set({ status: 'loading', error: null });
         try {
-          const { token } = await AuthApi.register({ email, password, fullName });
+          const { token } = await AuthApi.register({ email, password, fullName, role });
           set({ token });
           await get().refreshProfile();
         } catch (e: any) {

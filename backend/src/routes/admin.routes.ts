@@ -5,6 +5,7 @@ import { requireRole } from '@/middleware/role.middleware';
 import { supabaseClient } from '@/config/database.config';
 import { z } from 'zod';
 import { validate } from '@/middleware/validation.middleware';
+import { slugifyText } from '@/utils/slugify.utils';
 
 const r = Router();
 r.use(authMiddleware, requireRole('ADMIN'));
@@ -23,68 +24,16 @@ r.get('/stats', async (_req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// List users (basic fields + is_banned flag)
+// List users
 r.get('/users', async (_req, res, next) => {
   try {
     const db = supabaseClient('service');
     const { data, error } = await db
       .from('users')
-      .select('id, email, full_name, role, is_banned, created_at, updated_at')
+      .select('id, email, full_name, role, created_at, updated_at')
       .order('created_at', { ascending: false });
     if (error) throw error;
     res.json({ items: data || [] });
-  } catch (e) { next(e); }
-});
-
-// Remove direct role modifications from admin panel.
-// Instead, admins can ban/unban and set action restrictions.
-
-// Ban/unban users (permanent or temporary)
-const banSchema = z.object({
-  banned: z.boolean(),
-  until: z.string().datetime().nullable().optional(),
-  reason: z.string().max(500).nullable().optional(),
-});
-r.patch('/users/:id/ban', validate({ body: banSchema }), async (req, res, next) => {
-  try {
-    const db = supabaseClient('service');
-    const patch: any = {
-      is_banned: req.body.banned,
-      banned_until: req.body.until ?? null,
-      ban_reason: req.body.reason ?? null,
-    };
-    const { data, error } = await db
-      .from('users')
-      .update(patch)
-      .eq('id', req.params.id)
-      .select('id, email, full_name, role, is_banned, banned_until, ban_reason')
-      .single();
-    if (error) throw error;
-    res.json(data);
-  } catch (e) { next(e); }
-});
-
-// Set per-action restrictions
-const restrSchema = z.object({
-  can_chat: z.boolean().optional(),
-  can_order: z.boolean().optional(),
-  can_review: z.boolean().optional(),
-});
-r.patch('/users/:id/restrictions', validate({ body: restrSchema }), async (req, res, next) => {
-  try {
-    const db = supabaseClient('service');
-    const patch: any = {};
-    if (typeof req.body.can_chat === 'boolean') patch.can_chat = req.body.can_chat;
-    if (typeof req.body.can_order === 'boolean') patch.can_order = req.body.can_order;
-    if (typeof req.body.can_review === 'boolean') patch.can_review = req.body.can_review;
-    const { data, error } = await db
-      .from('users')
-      .update(patch)
-      .eq('id', req.params.id)
-      .select('id, email, full_name, role, can_chat, can_order, can_review')
-      .single();
-    if (error) throw error;
-    res.json(data);
   } catch (e) { next(e); }
 });
 
@@ -103,7 +52,6 @@ const vendorStatusSchema = z.object({ status: z.enum(['PENDING','APPROVED','SUSP
 r.patch('/vendors/:id/status', validate({ body: vendorStatusSchema }), async (req, res, next) => {
   try {
     const db = supabaseClient('service');
-    // Fetch vendor to access user_id
     const { data: vendor, error: vErr } = await db
       .from('vendors')
       .select('id, user_id, status, shop_name')
@@ -119,28 +67,82 @@ r.patch('/vendors/:id/status', validate({ body: vendorStatusSchema }), async (re
       .single();
     if (error) throw error;
 
-    // If approving, ensure user is promoted to VENDOR (atomic via RPC)
-    if (req.body.status === 'APPROVED' && vendor?.user_id) {
-      const { error: rpcErr } = await db.rpc('promote_to_vendor', {
-        p_user_id: vendor.user_id,
-        p_shop_name: data?.shop_name ?? vendor.shop_name ?? null,
-        p_status: 'APPROVED',
-      });
-      if (rpcErr) throw rpcErr;
+    if (vendor?.user_id) {
+      const nextRole = req.body.status === 'APPROVED' ? 'VENDOR' : 'CUSTOMER';
+      await db.from('users').update({ role: nextRole }).eq('id', vendor.user_id);
     }
+
     res.json(data);
   } catch (e) { next(e); }
 });
 
-export default r;
 // Categories management
-const catSchema = z.object({ name: z.string().min(2), slug: z.string().min(2) });
-r.post('/categories', validate({ body: catSchema }), async (req, res, next) => {
+const categorySchema = z.object({ name: z.string().min(2) });
+
+async function generateCategorySlug(
+  db: ReturnType<typeof supabaseClient>,
+  name: string,
+  excludeId?: string
+) {
+  const base = slugifyText(name, 'category');
+  let candidate = base;
+  let counter = 1;
+  while (true) {
+    const { data, error } = await db.from('categories').select('id').eq('slug', candidate).maybeSingle();
+    if (error && error.code !== 'PGRST116') throw error;
+    if (!data || data.id === excludeId) return candidate;
+    counter += 1;
+    candidate = `${base}-${counter}`;
+  }
+}
+
+r.get('/categories', async (_req, res, next) => {
   try {
     const db = supabaseClient('service');
-    const { data, error } = await db.from('categories').insert({ name: req.body.name, slug: req.body.slug }).select('*').single();
+    const { data, error } = await db
+      .from('categories')
+      .select('id, name, slug, created_at, updated_at')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    res.json({ items: data || [] });
+  } catch (e) { next(e); }
+});
+
+r.post('/categories', validate({ body: categorySchema }), async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const slug = await generateCategorySlug(db, req.body.name);
+    const { data, error } = await db
+      .from('categories')
+      .insert({ name: req.body.name, slug })
+      .select('id, name, slug, created_at, updated_at')
+      .single();
     if (error) throw error;
     res.status(201).json(data);
+  } catch (e) { next(e); }
+});
+
+r.patch('/categories/:id', validate({ body: categorySchema }), async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const slug = await generateCategorySlug(db, req.body.name, req.params.id);
+    const { data, error } = await db
+      .from('categories')
+      .update({ name: req.body.name, slug })
+      .eq('id', req.params.id)
+      .select('id, name, slug, created_at, updated_at')
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) { next(e); }
+});
+
+r.delete('/categories/:id', async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const { error } = await db.from('categories').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.status(204).send();
   } catch (e) { next(e); }
 });
 
@@ -210,3 +212,5 @@ r.delete('/vendors/:id', async (req, res, next) => {
     res.status(204).send();
   } catch (e) { next(e); }
 });
+
+export default r;

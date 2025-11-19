@@ -4,15 +4,28 @@ import { hashPassword, comparePassword } from '@/utils/hash.utils';
 import { signInternalJwt } from '@/utils/jwt.utils';
 import { BadRequestError, UnauthorizedError, NotFoundError } from '@/utils/error.utils';
 import type { UserDbRow } from '@/types/user.types';
+import { slugifyText } from '@/utils/slugify.utils';
 
 /**
  * Authentication & user account business logic.
  * Note: Supabase Auth is usually handled client-side. These helpers are for a custom password flow
  * using your own `users` table (as designed in your schema).
  */
+async function generateVendorSlug(db: ReturnType<typeof supabaseClient>, name: string) {
+  const base = slugifyText(name, 'vendor');
+  let candidate = base;
+  let counter = 1;
+  while (true) {
+    const { data, error } = await db.from('vendors').select('id').eq('slug', candidate).maybeSingle();
+    if (error && error.code !== 'PGRST116') throw new BadRequestError(error.message);
+    if (!data) return candidate;
+    candidate = `${base}-${counter++}`;
+  }
+}
+
 export const AuthService = {
   /** Register a basic CUSTOMER user in the users table */
-  async register(email: string, password: string, fullName: string) {
+  async register(email: string, password: string, fullName: string, role: 'customer' | 'vendor' = 'customer') {
     const db = supabaseClient('service');
     // check existing
     const { data: existing } = await db.from('users').select('id').eq('email', email).maybeSingle();
@@ -23,6 +36,19 @@ export const AuthService = {
       email, password_hash, full_name: fullName, role: 'CUSTOMER',
     }).select('*').single();
     if (error) throw new BadRequestError(error.message);
+
+    if (role === 'vendor') {
+      const shopName = fullName || email.split('@')[0] || 'Vendor';
+      const slug = await generateVendorSlug(db, shopName);
+      const { error: vendorError } = await db.from('vendors').insert({
+        user_id: data.id,
+        shop_name: shopName,
+        slug,
+        status: 'PENDING',
+      });
+      if (vendorError) throw new BadRequestError(vendorError.message);
+    }
+
     const token = signInternalJwt({ id: data.id, email: data.email, role: data.role });
     return { user: data, token };
   },

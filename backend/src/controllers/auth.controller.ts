@@ -8,7 +8,7 @@ export const AuthController = {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const body = validateInput(registerSchema, req.body);
-      const result = await AuthService.register(body.email, body.password, body.fullName);
+      const result = await AuthService.register(body.email, body.password, body.fullName, body.role);
       res.status(201).json(result);
     } catch (err) { next(err); }
   },

@@ -4,7 +4,6 @@ import { authMiddleware } from '@/middleware/auth.middleware';
 import { supabaseClient } from '@/config/database.config';
 import { z } from 'zod';
 import { validate } from '@/middleware/validation.middleware';
-import { requireNotBanned } from '@/middleware/moderation.middleware';
 import { requireRole } from '@/middleware/role.middleware';
 
 const r = Router();
@@ -17,7 +16,7 @@ const checkoutSchema = z.object({
   payment: z.object({ method: z.enum(['COD','WALLET']), wallet: z.enum(['ESEWA','KHALTI']).optional() }),
 });
 
-r.post('/checkout', requireNotBanned(), validate({ body: checkoutSchema }), async (req, res, next): Promise<void> => {
+r.post('/checkout', validate({ body: checkoutSchema }), async (req, res, next): Promise<void> => {
   try {
     const db = supabaseClient('service');
     const items: Array<{ product: string; qty: number }> = req.body.items || [];

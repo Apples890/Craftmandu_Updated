@@ -19,7 +19,18 @@ r.get('/slug/:slug', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Vendor self endpoints
+// Vendor status for authenticated users (regardless of role)
+r.get('/status/me', authMiddleware, async (req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const { data, error } = await db.from('vendors').select('id, status, shop_name, slug').eq('user_id', req.user!.id).maybeSingle();
+    if (error) throw error;
+    if (!data) { res.json({ status: 'NONE' }); return; }
+    res.json({ status: data.status, vendor: data });
+  } catch (e) { next(e); }
+});
+
+// Vendor self endpoints (approved vendors only)
 r.use(authMiddleware, requireRole('VENDOR'));
 
 r.get('/me', async (req, res, next) => {

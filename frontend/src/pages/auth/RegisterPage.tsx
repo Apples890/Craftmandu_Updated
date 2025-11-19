@@ -68,7 +68,7 @@ const RegisterPage: React.FC = () => {
     setErrors({});
 
     try {
-      await registerAction(formData.email, formData.password, formData.name);
+      await registerAction(formData.email, formData.password, formData.name, formData.role);
       navigate('/', { replace: true });
     } catch (error) {
       setErrors({ general: authError || 'Registration failed. Please try again.' });
