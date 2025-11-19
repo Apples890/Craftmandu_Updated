@@ -178,6 +178,47 @@ r.get('/analytics', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+r.get('/reviews/stats', async (_req, res, next) => {
+  try {
+    const db = supabaseClient('service');
+    const { data, error } = await db.from('reviews').select('rating, product_id');
+    if (error) throw error;
+    const rows = data || [];
+    const total = rows.length;
+    const breakdown: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+    const productMap: Record<string, { sum: number; count: number }> = {};
+    let sum = 0;
+    for (const r of rows) {
+      const rating = Math.min(5, Math.max(1, Number(r.rating) || 0));
+      sum += rating;
+      const key = String(rating);
+      breakdown[key] = (breakdown[key] || 0) + 1;
+      if (r.product_id) {
+        productMap[r.product_id] = productMap[r.product_id] || { sum: 0, count: 0 };
+        productMap[r.product_id].sum += rating;
+        productMap[r.product_id].count += 1;
+      }
+    }
+    const averageRating = total ? Math.round((sum / total) * 10) / 10 : 0;
+    const topProductIds = Object.entries(productMap)
+      .sort((a, b) => (b[1].sum / b[1].count) - (a[1].sum / a[1].count))
+      .slice(0, 5)
+      .map(([id]) => id);
+    let topProducts: Array<{ productId: string; name: string; slug: string; averageRating: number; reviewCount: number }> = [];
+    if (topProductIds.length) {
+      const { data: products } = await db.from('products').select('id, name, slug').in('id', topProductIds);
+      topProducts = (products || []).map((p: any) => ({
+        productId: p.id,
+        name: p.name,
+        slug: p.slug,
+        averageRating: Math.round((productMap[p.id].sum / productMap[p.id].count) * 10) / 10,
+        reviewCount: productMap[p.id].count,
+      })).sort((a, b) => b.averageRating - a.averageRating);
+    }
+    res.json({ total, averageRating, breakdown, topProducts });
+  } catch (e) { next(e); }
+});
+
 // Create vendor profile for a user (promote to vendor)
 const createVendorSchema = z.object({
   userId: z.string().uuid(),

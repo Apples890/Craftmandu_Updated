@@ -6,6 +6,7 @@ import ProductsSection from '@/dashboard/vendor/ProductsSection';
 import SalesAnalyticsSection from '@/dashboard/vendor/SalesAnalyticsSection';
 import InventorySection from '@/dashboard/vendor/InventorySection';
 import OrdersSection from '@/dashboard/vendor/OrdersSection';
+import VendorReviewsSection from '@/dashboard/vendor/VendorReviewsSection';
 import { useAuth } from '@/context/AuthContext';
 import { VendorApi } from '@/api/vendor.api';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/common/dialog';
@@ -116,12 +117,13 @@ export default function VendorDashboard() {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-5 w-full">
+        <TabsList className="grid grid-cols-6 w-full">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="store">Store</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="sales">Sales Analytics</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
         </TabsList>
 
@@ -266,6 +268,14 @@ export default function VendorDashboard() {
           <Card>
             <CardContent className="pt-6">
               <InventorySection />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reviews" className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <VendorReviewsSection />
             </CardContent>
           </Card>
         </TabsContent>

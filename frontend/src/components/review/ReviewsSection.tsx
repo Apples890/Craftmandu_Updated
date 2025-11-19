@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ReviewApi, Review } from '@/api/review.api';
+import React, { useEffect, useState } from 'react';
+import { ReviewApi, Review, ReviewSummary } from '@/api/review.api';
 import { Star } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
@@ -8,32 +8,29 @@ type Props = { productId?: string; productSlug?: string };
 
 export default function ReviewsSection({ productId, productSlug }: Props) {
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [summary, setSummary] = useState<ReviewSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
 
   async function load() {
     setLoading(true);
     try {
-      let list: Review[] = [];
+      let response: { reviews: Review[]; summary?: ReviewSummary } | null = null;
       const uuidRe = /^[0-9a-fA-F-]{36}$/;
       if (productSlug) {
-        list = await ReviewApi.listByProductSlug(productSlug);
+        response = await ReviewApi.listByProductSlug(productSlug);
       } else if (productId && uuidRe.test(productId)) {
-        list = await ReviewApi.listByProductId(productId);
+        response = await ReviewApi.listByProductId(productId);
       } else if (productId) {
-        list = await ReviewApi.listByProductSlug(productId);
+        response = await ReviewApi.listByProductSlug(productId);
       }
-      setReviews(list);
+      setReviews(response?.reviews || []);
+      setSummary(response?.summary || null);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load reviews');
     } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, [productId, productSlug]);
-
-  const avg = useMemo(() => {
-    if (!reviews.length) return 0;
-    return Math.round((reviews.reduce((s, r) => s + (Number(r.rating) || 0), 0) / reviews.length) * 10) / 10;
-  }, [reviews]);
 
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(5);
@@ -54,17 +51,37 @@ export default function ReviewsSection({ productId, productSlug }: Props) {
     } finally { setSaving(false); }
   }
 
+  const totalReviews = summary?.count ?? reviews.length;
+  const averageRating = summary?.averageRating ?? (totalReviews ? Math.round((reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / totalReviews) * 10) / 10 : 0);
+
   return (
     <div className="mt-10">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <span className="text-xl font-semibold">Reviews</span>
-          <span className="text-sm text-gray-600">{reviews.length} reviews â€¢ {avg}â˜…</span>
+          <span className="text-sm text-gray-600">{totalReviews} reviews · {averageRating}?</span>
         </div>
         {user && productId && (
           <button className="btn-primary" onClick={() => setOpen(!open)}>{open ? 'Cancel' : 'Write a review'}</button>
         )}
       </div>
+
+      {summary && (
+        <div className="flex flex-wrap gap-4 mb-4 text-sm text-gray-600">
+          {[5, 4, 3, 2, 1].map((n) => (
+            <div key={n} className="flex items-center gap-2">
+              <span className="font-medium">{n}?</span>
+              <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-2 bg-yellow-400"
+                  style={{ width: `${summary.count ? ((summary.breakdown[String(n)] || 0) / summary.count) * 100 : 0}%` }}
+                />
+              </div>
+              <span>{summary.breakdown[String(n)] || 0}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {open && (
         <div className="card p-4 mb-6 space-y-3">
@@ -77,13 +94,13 @@ export default function ReviewsSection({ productId, productSlug }: Props) {
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="input-field" />
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Share your experience" className="input-field" rows={4} />
           <div>
-            <button disabled={saving} className="btn-primary" onClick={submit}>{saving ? 'Submittingâ€¦' : 'Submit Review'}</button>
+            <button disabled={saving} className="btn-primary" onClick={submit}>{saving ? 'Submitting…' : 'Submit Review'}</button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <div className="text-gray-600">Loadingâ€¦</div>
+        <div className="text-gray-600">Loading…</div>
       ) : reviews.length === 0 ? (
         <div className="text-gray-600">No reviews yet</div>
       ) : (
@@ -99,6 +116,17 @@ export default function ReviewsSection({ productId, productSlug }: Props) {
               {r.title && <div className="font-medium mb-1">{r.title}</div>}
               {r.comment && <div className="text-gray-700 text-sm">{r.comment}</div>}
               {r.order_id && <div className="mt-2 text-xs text-green-700">Verified purchase</div>}
+              {r.vendor_reply && (
+                <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm">
+                  <div className="text-xs uppercase text-gray-500 mb-1">Vendor reply</div>
+                  <p className="text-gray-700">{r.vendor_reply}</p>
+                  {r.vendor_reply_at && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {new Date(r.vendor_reply_at).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

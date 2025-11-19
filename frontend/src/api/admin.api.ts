@@ -50,4 +50,13 @@ export const AdminApi = {
   async deleteVendor(vendorId: string) {
     await api.delete(`/api/admin/vendors/${vendorId}`);
   },
+  async reviewStats() {
+    const res = await api.get('/api/admin/reviews/stats');
+    return res.data as {
+      total: number;
+      averageRating: number;
+      breakdown: Record<string, number>;
+      topProducts: Array<{ productId: string; name: string; slug: string; averageRating: number; reviewCount: number }>;
+    };
+  },
 };
